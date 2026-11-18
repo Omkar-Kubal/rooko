@@ -1,0 +1,29 @@
+name: Detector version discovery
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test and discover exact version candidates
+        run: |
+          node --test tool/detector_registry/discover_versions.test.mjs
+          node tool/detector_registry/discover_versions.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: detector-version-candidates-${{ github.run_number }}
+          path: tool/detector_registry/discovery-candidates.json
+          if-no-files-found: error
+          retention-days: 30

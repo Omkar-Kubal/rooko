@@ -1,0 +1,299 @@
+<Rive version="1" kind="fragment">
+    <Artboard defaultStateMachineId="0:7" width="1254" height="1254" styleId="0:5" name="Rook" id="0:2">
+        <StateMachine name="Rook" id="0:7">
+            <StateMachineBool name="isStrained" value="false" id="0:30"/>
+            <StateMachineBool name="isInjured" value="false" id="0:52"/>
+            <StateMachineBool name="isQueasy" value="false" id="0:83"/>
+            <StateMachineLayer name="Rook" id="0:8">
+                <AnyState x="640" y="-100"/>
+                <ExitState x="800" y="-100"/>
+                <EntryState>
+                    <StateTransition stateToId="0:12"/>
+                </EntryState>
+                <AnimationState x="180" y="0" animationId="0:6" id="0:12">
+                    <StateTransition stateToId="0:84" duration="150">
+                        <TransitionBoolCondition inputId="0:83" opValue="equal"/>
+                    </StateTransition>
+                    <StateTransition stateToId="0:62" duration="150">
+                        <TransitionBoolCondition inputId="0:83" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:52" opValue="equal"/>
+                    </StateTransition>
+                    <StateTransition stateToId="0:22" duration="150">
+                        <TransitionBoolCondition inputId="0:83" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:52" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:30" opValue="equal"/>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="380" y="0" animationId="0:23" id="0:22">
+                    <StateTransition stateToId="0:84" duration="150">
+                        <TransitionBoolCondition inputId="0:83" opValue="equal"/>
+                    </StateTransition>
+                    <StateTransition stateToId="0:62" duration="150">
+                        <TransitionBoolCondition inputId="0:83" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:52" opValue="equal"/>
+                    </StateTransition>
+                    <StateTransition stateToId="0:12" duration="150">
+                        <TransitionBoolCondition inputId="0:83" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:52" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:30" opValue="notEqual"/>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="580" y="0" animationId="0:60" id="0:62">
+                    <StateTransition stateToId="0:84" duration="150">
+                        <TransitionBoolCondition inputId="0:83" opValue="equal"/>
+                    </StateTransition>
+                    <StateTransition stateToId="0:22" duration="150">
+                        <TransitionBoolCondition inputId="0:83" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:52" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:30" opValue="equal"/>
+                    </StateTransition>
+                    <StateTransition stateToId="0:12" duration="150">
+                        <TransitionBoolCondition inputId="0:83" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:52" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:30" opValue="notEqual"/>
+                    </StateTransition>
+                </AnimationState>
+                <AnimationState x="780" y="0" animationId="0:85" id="0:84">
+                    <StateTransition stateToId="0:62" duration="150">
+                        <TransitionBoolCondition inputId="0:83" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:52" opValue="equal"/>
+                    </StateTransition>
+                    <StateTransition stateToId="0:22" duration="150">
+                        <TransitionBoolCondition inputId="0:83" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:52" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:30" opValue="equal"/>
+                    </StateTransition>
+                    <StateTransition stateToId="0:12" duration="150">
+                        <TransitionBoolCondition inputId="0:83" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:52" opValue="notEqual"/>
+                        <TransitionBoolCondition inputId="0:30" opValue="notEqual"/>
+                    </StateTransition>
+                </AnimationState>
+            </StateMachineLayer>
+        </StateMachine>
+        <LayoutComponentStyle name="Artboard Style" id="0:5"/>
+
+        <LinearAnimation loopValue="loop" duration="240" name="Ready Blink" id="0:6">
+            <KeyedObject objectId="0:40">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:41">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:54">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:82">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:55">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:20">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="112"/>
+                    <KeyFrameDouble value="1" interpolationType="linear" frame="116"/>
+                    <KeyFrameDouble value="1" interpolationType="linear" frame="119"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="123"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="240"/>
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:21">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="112"/>
+                    <KeyFrameDouble value="1" interpolationType="linear" frame="116"/>
+                    <KeyFrameDouble value="1" interpolationType="linear" frame="119"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="123"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="240"/>
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+
+        <LinearAnimation loopValue="loop" duration="360" name="Strained Blink" id="0:23">
+            <KeyedObject objectId="0:40">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:41">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:54">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:82">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:55">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:20">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:21">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:25">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="170"/>
+                    <KeyFrameDouble value="1" interpolationType="linear" frame="176"/>
+                    <KeyFrameDouble value="1" interpolationType="linear" frame="180"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="186"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="360"/>
+                </KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:26">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="170"/>
+                    <KeyFrameDouble value="1" interpolationType="linear" frame="176"/>
+                    <KeyFrameDouble value="1" interpolationType="linear" frame="180"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="186"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="360"/>
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+
+        <LinearAnimation loopValue="loop" duration="320" name="Injured Blink" id="0:60">
+            <KeyedObject objectId="0:40">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:41">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:54">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:82">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:20">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:21">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:25">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:26">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:55">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="148"/>
+                    <KeyFrameDouble value="1" interpolationType="linear" frame="154"/>
+                    <KeyFrameDouble value="1" interpolationType="linear" frame="158"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="164"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="320"/>
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+
+        <LinearAnimation loopValue="loop" duration="360" name="Queasy Blink" id="0:85">
+            <KeyedObject objectId="0:40">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:41">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:54">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:82">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="1" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:20">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:21">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:25">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:26">
+                <KeyedProperty propertyKey="18"><KeyFrameDouble value="0" interpolationType="linear"/></KeyedProperty>
+            </KeyedObject>
+            <KeyedObject objectId="0:55">
+                <KeyedProperty propertyKey="18">
+                    <KeyFrameDouble value="0" interpolationType="linear"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="170"/>
+                    <KeyFrameDouble value="1" interpolationType="linear" frame="176"/>
+                    <KeyFrameDouble value="1" interpolationType="linear" frame="180"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="186"/>
+                    <KeyFrameDouble value="0" interpolationType="linear" frame="360"/>
+                </KeyedProperty>
+            </KeyedObject>
+        </LinearAnimation>
+
+        <Node x="443" y="570" opacity="0" name="Ready Left Blink" id="0:20">
+            <Shape name="Closed Lid Line">
+                <Ellipse width="182" height="10" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF111111" name="Color"/></Fill>
+            </Shape>
+            <Shape name="Closed Eye Mask">
+                <Ellipse width="240" height="260" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FFF39F9B" name="Color"/></Fill>
+            </Shape>
+        </Node>
+
+        <Node x="757" y="570" opacity="0" name="Ready Right Blink" id="0:21">
+            <Shape name="Closed Lid Line">
+                <Ellipse width="182" height="10" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF111111" name="Color"/></Fill>
+            </Shape>
+            <Shape name="Closed Eye Mask">
+                <Ellipse width="240" height="260" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FFF39F9B" name="Color"/></Fill>
+            </Shape>
+        </Node>
+
+        <Node x="443" y="590" opacity="0" name="Strained Left Blink" id="0:25">
+            <Shape name="Closed Lid Line">
+                <Ellipse width="150" height="8" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF111111" name="Color"/></Fill>
+            </Shape>
+            <Shape name="Closed Eye Mask">
+                <Ellipse width="250" height="250" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FFF4A09C" name="Color"/></Fill>
+            </Shape>
+        </Node>
+
+        <Node x="757" y="590" opacity="0" name="Strained Right Blink" id="0:26">
+            <Shape name="Closed Lid Line">
+                <Ellipse width="150" height="8" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FF111111" name="Color"/></Fill>
+            </Shape>
+            <Shape name="Closed Eye Mask">
+                <Ellipse width="250" height="250" name="Path"/>
+                <Fill name="Fill"><SolidColor colorValue="FFF4A09C" name="Color"/></Fill>
+            </Shape>
+        </Node>
+
+        <Node x="627" y="627" opacity="0" name="Pale Blink Overlay" id="0:55">
+            <Image x="0" y="0" originX="0.5" originY="0.5" assetId="0:81" name="Pale Closed Eyes"/>
+        </Node>
+
+        <Node x="627" y="627" opacity="1" name="Ready Art" id="0:40">
+            <Image x="0" y="0" originX="0.5" originY="0.5" assetId="0:50" name="Ready Artwork"/>
+        </Node>
+        <Node x="627" y="627" opacity="0" name="Strained Art" id="0:41">
+            <Image x="0" y="0" originX="0.5" originY="0.5" assetId="0:51" name="Strained Artwork"/>
+        </Node>
+        <Node x="627" y="627" opacity="0" name="Injured Art" id="0:54">
+            <Image x="0" y="0" originX="0.5" originY="0.5" assetId="0:53" name="Injured Artwork"/>
+        </Node>
+        <Node x="627" y="627" opacity="0" name="Queasy Art" id="0:82">
+            <Image x="0" y="0" originX="0.5" originY="0.5" assetId="0:86" name="Queasy Artwork"/>
+        </Node>
+    </Artboard>
+
+    <ImageAsset file="rook-ready-transparent.png" name="Ready Artwork" id="0:50"/>
+    <ImageAsset file="rook-strained-transparent.png" name="Strained Artwork" id="0:51"/>
+    <ImageAsset file="rook-injured-transparent.png" name="Injured Artwork" id="0:53"/>
+    <ImageAsset file="rook-injured-blink-overlay.png" name="Pale Closed Eyes" id="0:81"/>
+    <ImageAsset file="rook-about-to-vomit-transparent.png" name="Queasy Artwork" id="0:86"/>
+</Rive>

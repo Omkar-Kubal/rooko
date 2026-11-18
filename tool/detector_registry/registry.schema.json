@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rooko signed detector registry payload",
+  "oneOf": [
+    { "$ref": "#/$defs/v1" },
+    { "$ref": "#/$defs/v2" }
+  ],
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packageName", "versionName", "status", "sourceUrl"],
+      "properties": {
+        "packageName": { "$ref": "#/$defs/packageName" },
+        "versionName": { "type": "string", "pattern": "^[A-Za-z0-9.+_-]{1,64}$" },
+        "status": { "enum": ["catalogued", "supported", "disabled"] },
+        "profileId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+        "validation": { "$ref": "#/$defs/validation" },
+        "sourceUrl": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 512,
+          "pattern": "^https://[^/@?#]+(?:/[^?#]*)?$"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "catalogued" } } },
+          "then": { "not": { "required": ["profileId"] } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "supported" } } },
+          "then": { "required": ["profileId"] }
+        }
+      ]
+    },
+    "packageName": {
+      "enum": [
+        "com.google.android.youtube",
+        "com.instagram.android"
+      ]
+    },
+    "resourceId": {
+      "type": "string",
+      "pattern": "^(com\\.google\\.android\\.youtube|com\\.instagram\\.android):id/[a-z_][a-z0-9_]*$"
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reportId",
+        "transitionCases",
+        "stationaryCases",
+        "deviceFamilies",
+        "precisionPercent",
+        "recallPercent",
+        "stationaryRepeats"
+      ],
+      "properties": {
+        "reportId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$" },
+        "transitionCases": { "type": "integer", "minimum": 200 },
+        "stationaryCases": { "type": "integer", "minimum": 100 },
+        "deviceFamilies": { "type": "integer", "minimum": 3 },
+        "precisionPercent": { "type": "number", "minimum": 98, "maximum": 100 },
+        "recallPercent": { "type": "number", "minimum": 90, "maximum": 100 },
+        "stationaryRepeats": { "const": 0 }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profileId",
+        "packageName",
+        "strategyId",
+        "feedMarkerViewIds",
+        "transitionViewIds",
+        "identityStrategy"
+      ],
+      "properties": {
+        "profileId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+        "packageName": { "$ref": "#/$defs/packageName" },
+        "strategyId": { "const": "accessibility_structure_v1" },
+        "feedMarkerViewIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/resourceId" }
+        },
+        "transitionViewIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/resourceId" }
+        },
+        "identityStrategy": {
+          "enum": [
+            "stable_opaque_accessibility_token",
+            "structural_node_pair",
+            "bounded_transition_fingerprint"
+          ]
+        },
+        "identityNodeViewId": { "$ref": "#/$defs/resourceId" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "identityStrategy": { "const": "bounded_transition_fingerprint" }
+            }
+          },
+          "then": { "not": { "required": ["identityNodeViewId"] } },
+          "else": { "required": ["identityNodeViewId"] }
+        }
+      ]
+    },
+    "base": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "sequence",
+        "issuedAtEpochSeconds",
+        "expiresAtEpochSeconds",
+        "entries"
+      ],
+      "properties": {
+        "schemaVersion": { "type": "integer" },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "issuedAtEpochSeconds": { "type": "integer", "minimum": 1 },
+        "expiresAtEpochSeconds": { "type": "integer", "minimum": 1 },
+        "entries": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": { "$ref": "#/$defs/entry" }
+        }
+      }
+    },
+    "v1": {
+      "unevaluatedProperties": false,
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "properties": { "schemaVersion": { "const": 1 } }
+        },
+        {
+          "properties": {
+            "entries": {
+              "items": { "not": { "required": ["validation"] } }
+            }
+          }
+        }
+      ]
+    },
+    "v2": {
+      "unevaluatedProperties": false,
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "required": ["profiles"],
+          "properties": {
+            "schemaVersion": { "const": 2 },
+            "profiles": {
+              "type": "array",
+              "maxItems": 500,
+              "items": { "$ref": "#/$defs/profile" }
+            }
+          }
+        },
+        {
+          "properties": {
+            "entries": {
+              "items": {
+                "allOf": [
+                  {
+                    "if": { "properties": { "status": { "const": "supported" } } },
+                    "then": { "required": ["validation"] }
+                  },
+                  {
+                    "if": { "properties": { "status": { "enum": ["catalogued", "disabled"] } } },
+                    "then": { "not": { "required": ["validation"] } }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,164 @@
+<section class="rooko-privacy" aria-labelledby="rooko-privacy-title">
+  <style>
+    .rooko-privacy {
+      --ink: #111111;
+      --muted: #595959;
+      --line: #d9d9d9;
+      box-sizing: border-box;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 32px 24px 48px;
+      color: var(--ink);
+      background: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 16px;
+      line-height: 1.65;
+    }
+    .rooko-privacy * { box-sizing: border-box; }
+    .rooko-privacy h1,
+    .rooko-privacy h2 { color: var(--ink); line-height: 1.25; }
+    .rooko-privacy h1 { margin: 0 0 8px; font-size: 2rem; }
+    .rooko-privacy h2 {
+      margin: 32px 0 8px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      font-size: 1.2rem;
+    }
+    .rooko-privacy p { margin: 8px 0 14px; }
+    .rooko-privacy ul { padding-left: 24px; }
+    .rooko-privacy li { margin: 6px 0; }
+    .rooko-privacy .updated { color: var(--muted); font-size: 0.92rem; }
+    .rooko-privacy a { color: #111111; text-decoration: underline; }
+    @media (max-width: 480px) {
+      .rooko-privacy { padding: 24px 18px 36px; font-size: 15px; }
+      .rooko-privacy h1 { font-size: 1.7rem; }
+    }
+  </style>
+
+  <h1 id="rooko-privacy-title">Rooko Privacy Policy</h1>
+  <p class="updated">Last updated: November 19, 2026</p>
+  <p>
+    Rooko helps you understand activity in Instagram Reels and YouTube Shorts.
+    This policy explains what the Android app uses, where it is kept, when the
+    app connects to a network, and how to manage your information.
+  </p>
+
+  <h2>Information stored on your device</h2>
+  <p>Rooko stores the following in Android's private app storage:</p>
+  <ul>
+    <li>Your selected apps, appearance choice, consent, and counter settings.</li>
+    <li>Combined and per-app daily counts, hourly count totals, daily coverage information, and approximate daily observed-feed time.</li>
+    <li>Individual accepted-count times for up to seven days; older event times are removed while daily totals remain.</li>
+    <li>Detailed coverage-gap records for up to 30 days.</li>
+    <li>Legacy correction records, if present from migration, including the date, app, count difference, reason code, and creation time. They are not displayed or included in the current total.</li>
+    <li>Onboarding answers as a temporary local draft, cleared when onboarding is complete.</li>
+    <li>A cached signed detector-compatibility list, which contains app-version rules and no personal usage records.</li>
+  </ul>
+  <p>
+    Daily totals, hourly aggregates, coverage summaries, observed-time
+    aggregates, legacy correction records, and settings remain on the device
+    until you clear Rooko's app storage or uninstall Rooko. In-app export and deletion are not
+    currently available. To clear local data, open Android Settings, choose
+    Apps, choose Rooko, open Storage, and select Clear storage. Android backup
+    settings may restore eligible app data.
+  </p>
+
+  <h2>Accessibility and counting</h2>
+  <p>
+    Counting starts only after you review the in-app disclosure, give
+    affirmative consent, and enable Android Accessibility. Rooko processes only
+    the selected Instagram Reels and YouTube Shorts apps. Installed app
+    versions are checked on your device. For some detection paths, Rooko may
+    briefly read bounded visible labels and immediately hash them in memory
+    for duplicate handling. Raw labels are not saved. Rooko does not save
+    messages, images, audio, video, screenshots, or full Accessibility trees.
+    You can turn off Accessibility access at any time in Android Settings.
+  </p>
+
+  <h2>Observed time</h2>
+  <p>
+    The approximate daily time total is built from short checks while a
+    selected, recognized feed is in the foreground. It does not establish
+    whether a video played or whether you watched it attentively. Long gaps and
+    known interruptions are excluded. This measurement does not require overlay
+    access.
+  </p>
+
+  <h2>Floating counter</h2>
+  <p>
+    The floating counter is optional and requires separate Android Display
+    over other apps access. It shows Rook and your shared daily count over a
+    recognized selected feed. It does not capture the screen or save feed
+    content. Turn it off in Rooko or revoke overlay access in Android Settings.
+  </p>
+
+  <h2>Detector compatibility checks</h2>
+  <p>
+    Rooko may download a signed detector-compatibility list over HTTPS. That
+    request does not include your selected apps, installed app versions,
+    counts, or observed-time records. The external registry host and your
+    network provider may receive your IP address, request time, and standard
+    connection metadata. We have not verified the registry host's log-retention
+    period.
+  </p>
+  <h2>App analytics and crash reports</h2>
+  <p>
+    Firebase Analytics and Crashlytics start automatically when Rooko opens on
+    Android. This collection is separate from the Accessibility permission.
+    Google Firebase may receive automatic app and session events, such as first
+    opens and app use, and Rooko's parameter-free <code>rooko_app_open</code>
+    event. It may also receive app-instance or installation identifiers, app
+    version, device and operating-system details, and standard connection
+    information such as an IP address. Crash reports may include exception
+    messages and stack traces.
+  </p>
+  <p>
+    Rooko does not set a Firebase user ID or add your selected apps, counts,
+    observed-time totals, Accessibility signals or content, feed labels, item
+    IDs, screenshots, or Help &amp; Feedback summaries to Firebase events,
+    custom keys, or logs. Automatic Android Activity screen reporting and
+    advertising ID collection are disabled. Rooko has no account, advertising,
+    purchases, or usage-sync service. Your counts and observed-time totals are
+    not uploaded to Rooko or sold.
+  </p>
+  <p>
+    Rooko currently has no in-app switch for Firebase Analytics or Crashlytics.
+    Uninstalling Rooko stops future collection from that installation. Clearing
+    app storage or uninstalling does not erase records already received by
+    Google. Google's Firebase retention and data-handling terms apply; see
+    <a href="https://firebase.google.com/support/privacy">Firebase privacy and security</a>.
+    For questions or a data request, use the contact address below. Rooko has
+    no account linking an email address to a Firebase installation identifier,
+    so a specific Firebase record may not be identifiable from an email alone.
+  </p>
+
+  <h2>Help and feedback</h2>
+  <p>
+    Troubleshooting details stay on your device unless you review a diagnostic
+    summary and choose to copy it. Feature Request and Support Email actions
+    open your email app; Rooko does not send a message or a diagnostic summary
+    automatically. Information you choose to send by email is handled by your
+    email provider and the support recipient.
+  </p>
+
+  <h2>Children</h2>
+  <p>
+    Rooko is not designed for children under 13. If you believe a child under
+    13 has provided personal information to the app, contact us so we can
+    address the concern.
+  </p>
+
+  <h2>Changes to this policy</h2>
+  <p>
+    This policy may change when the app's data handling changes. The latest
+    revision date appears at the top of this page. If a change affects why
+    Accessibility is used, Rooko will request renewed in-app consent before
+    using the updated purpose.
+  </p>
+
+  <h2>Contact</h2>
+  <p>
+    For privacy questions or requests, email
+    <a href="mailto:omkarkubal@protonmail.com">omkarkubal@protonmail.com</a>.
+  </p>
+</section>

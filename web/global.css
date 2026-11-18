@@ -1,0 +1,190 @@
+/*
+ * Rooko global tokens.
+ * Dart tokens in lib/core/design_system are canonical; keep these mirrored
+ * names and values in sync for Flutter web previews and browser tooling.
+ */
+@font-face {
+  font-family: "Google Sans";
+  src: url("assets/assets/fonts/GoogleSans-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Google Sans";
+  src: url("assets/assets/fonts/GoogleSans-Medium.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Google Sans";
+  src: url("assets/assets/fonts/GoogleSans-SemiBold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Google Sans";
+  src: url("assets/assets/fonts/GoogleSans-Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light dark;
+
+  --color-canvas: #ffffff;
+  --color-canvas-dark: #080808;
+  --color-canvas-amoled: #000000;
+  --color-ink: #000000;
+  --color-on-dark: #ffffff;
+  --color-text-secondary-light: #595959;
+  --color-text-secondary-dark: #bdbdbd;
+  --color-surface-light: #ffffff;
+  --color-surface-light-secondary: #ffffff;
+  --color-surface-dark: #171717;
+  --color-surface-dark-secondary: #171717;
+  --color-accent-light: #000000;
+  --color-accent-dark: #303030;
+  --color-outline-light: #8a8a8a;
+  --color-outline-dark: #757575;
+  --color-divider-light: #d9d9d9;
+  --color-divider-dark: #404040;
+  --color-scrim: rgb(0 0 0 / 72.16%);
+
+  --color-background: var(--color-canvas);
+  --color-surface: var(--color-surface-light);
+  --color-surface-secondary: var(--color-surface-light-secondary);
+  --color-text-primary: var(--color-ink);
+  --color-text-secondary: var(--color-text-secondary-light);
+  --color-outline: var(--color-outline-light);
+  --color-divider: var(--color-divider-light);
+  --color-accent: var(--color-accent-light);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --radius-card: 16px;
+  --radius-sheet: 24px;
+  --radius-pill: 999px;
+
+  --font-family-ui: "Google Sans", Roboto, Arial, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 22px;
+  --font-size-xl: 28px;
+  --font-size-xxl: 32px;
+  --font-size-metric: 56px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --text-page-title-size: 22px;
+  --text-page-title-weight: var(--font-weight-semibold);
+  --text-page-title-line-height: 28px;
+  --text-section-title-size: 16px;
+  --text-section-title-weight: var(--font-weight-semibold);
+  --text-section-title-line-height: 22px;
+  --text-card-title-size: 16px;
+  --text-card-title-weight: var(--font-weight-semibold);
+  --text-card-title-line-height: 22px;
+  --text-body-size: 16px;
+  --text-body-weight: var(--font-weight-regular);
+  --text-body-line-height: 24px;
+  --text-supporting-size: 12px;
+  --text-supporting-weight: var(--font-weight-regular);
+  --text-supporting-line-height: 16px;
+  --text-button-size: 14px;
+  --text-button-weight: var(--font-weight-semibold);
+  --text-button-line-height: 20px;
+  --text-metric-size: 56px;
+  --text-metric-weight: var(--font-weight-semibold);
+  --text-metric-line-height: 62px;
+  --text-chart-label-size: 12px;
+  --text-chart-label-weight: var(--font-weight-regular);
+  --text-chart-label-line-height: 16px;
+
+  --motion-control-duration: 180ms;
+  --motion-mascot-duration: 500ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-background: var(--color-canvas-dark);
+    --color-surface: var(--color-surface-dark);
+    --color-surface-secondary: var(--color-surface-dark-secondary);
+    --color-text-primary: var(--color-on-dark);
+    --color-text-secondary: var(--color-text-secondary-dark);
+    --color-outline: var(--color-outline-dark);
+    --color-divider: var(--color-divider-dark);
+    --color-accent: var(--color-accent-dark);
+  }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-background: var(--color-canvas);
+  --color-surface: var(--color-surface-light);
+  --color-surface-secondary: var(--color-surface-light-secondary);
+  --color-text-primary: var(--color-ink);
+  --color-text-secondary: var(--color-text-secondary-light);
+  --color-outline: var(--color-outline-light);
+  --color-divider: var(--color-divider-light);
+  --color-accent: var(--color-accent-light);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-background: var(--color-canvas-dark);
+  --color-surface: var(--color-surface-dark);
+  --color-surface-secondary: var(--color-surface-dark-secondary);
+  --color-text-primary: var(--color-on-dark);
+  --color-text-secondary: var(--color-text-secondary-dark);
+  --color-outline: var(--color-outline-dark);
+  --color-divider: var(--color-divider-dark);
+  --color-accent: var(--color-accent-dark);
+}
+
+:root[data-theme="amoled"] {
+  color-scheme: dark;
+  --color-background: var(--color-canvas-amoled);
+  --color-surface: var(--color-canvas-amoled);
+  --color-surface-secondary: var(--color-canvas-amoled);
+  --color-text-primary: var(--color-on-dark);
+  --color-text-secondary: var(--color-text-secondary-dark);
+  --color-outline: var(--color-outline-dark);
+  --color-divider: var(--color-divider-dark);
+  --color-accent: var(--color-accent-dark);
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--color-background);
+  font-family: var(--font-family-ui);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

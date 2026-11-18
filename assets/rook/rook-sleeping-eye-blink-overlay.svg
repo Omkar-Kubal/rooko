@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1254" height="1254" viewBox="0 0 230 230">
+  <!-- Only the two closed eyelids change; the rest of Sleeping Rook is static. -->
+  <path d="M59 94h42v24H59z M120 94h42v24h-42z" fill="#F4A09C"/>
+  <path d="M64 103 Q79 111 96 103 M125 103 Q141 111 157 103"
+        fill="none" stroke="#171112" stroke-width="2.8" stroke-linecap="round"/>
+</svg>

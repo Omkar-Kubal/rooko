@@ -1,0 +1,4 @@
+<resources>
+    <string name="scroll_accessibility_service_label">Rooko tracking</string>
+    <string name="scroll_accessibility_service_description">With your consent, Rooko uses Accessibility to recognize selected Instagram Reels and YouTube Shorts feeds and item changes. It may briefly read visible labels and hash them in memory to estimate item changes; labels are not saved. It also checks app identity and feed-marker IDs at short intervals to estimate time while a recognized feed is in the foreground. Daily count and observed-time totals stay on this device. Time does not establish playback or attention. Overlay access is not required for this measurement.</string>
+</resources>

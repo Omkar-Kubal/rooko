@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#8199c8">
+  <title>Rook icon study</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; min-height: 100%; margin: 0; }
+    body {
+      min-height: 100svh;
+      display: grid;
+      place-items: center;
+      padding: 32px 18px 44px;
+      color: #171717;
+      font-family: Roboto, "Google Sans", system-ui, sans-serif;
+      background: linear-gradient(180deg, #8298c6 0%, #bdc1c2 54%, #ecd7a5 100%);
+    }
+    main { width: 100%; max-width: 390px; }
+    header { margin: 0 4px 36px; }
+    .eyebrow { font-size: 11px; letter-spacing: .16em; font-weight: 700; text-transform: uppercase; opacity: .72; }
+    h1 { margin: 9px 0 0; font-size: 25px; line-height: 1.08; letter-spacing: -.035em; font-weight: 700; }
+    .sub { margin: 8px 0 0; font-size: 13px; opacity: .75; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; align-items: start; }
+    figure { margin: 0; min-width: 0; text-align: center; }
+    img { display: block; width: 48px; height: 48px; margin: 0 auto 8px; object-fit: cover; border-radius: 22%; }
+    figcaption { font-size: 11px; line-height: 1.2; font-weight: 600; white-space: nowrap; }
+    footer { margin: 34px 4px 0; font-size: 11px; opacity: .72; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">Rook · icon study</div>
+      <h1>Home-screen size</h1>
+      <p class="sub">Three marks, shown at 48 dp</p>
+    </header>
+    <section class="grid" aria-label="Rook app icon candidates">
+      <figure><img src="rook-mark-contour.png" alt=""><figcaption>Contour</figcaption></figure>
+      <figure><img src="rook-mark-negative-space.png" alt=""><figcaption>One-color</figcaption></figure>
+      <figure><img src="rook-mark-pixel-edge.png" alt=""><figcaption>Pixel edge</figcaption></figure>
+    </section>
+    <footer>Rook app icon candidates</footer>
+  </main>
+</body>
+</html>
