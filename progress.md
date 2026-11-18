@@ -2,8 +2,8 @@
 
 ## Initial public GitHub repository (2026-11-19)
 
-- User requested `git init`, first commit, `main`, and push to https://github.com/Omkar-Kubal/rooko. The public remote exists and has no refs. Initialized the local repository on `main` and staged the app source, current assets, documentation, and written evidence (about 117.5 MB; largest about 3.1 MB).
-- Expanded `.gitignore` for local build/temp output, raw third-party APKs/decompiled research, device screenshots/recordings/UI dumps, archived art, and the separate nested `sites/detector-registry` repository. Written research and QA Markdown remain staged. Included the Android Gradle wrapper scripts/JAR for a reproducible checkout; `android/gradlew` is executable. Staged-file scan found no private-key or token pattern; `android/app/google-services.json` is included as Android Firebase client configuration. The first commit and push remain to be completed.
+- User requested `git init`, first commit, `main`, and push to https://github.com/Omkar-Kubal/rooko. The public remote had no refs at the start. Initialized the local repository on `main` and staged the app source, current assets, documentation, and written evidence (about 117.5 MB; largest about 3.1 MB). Commit `5b88208` (`first commit`) pushed to `origin/main`; `git ls-remote` returned the same commit hash and the branch tracks `origin/main`.
+- Expanded `.gitignore` for local build/temp output, raw third-party APKs/decompiled research, device screenshots/recordings/UI dumps, archived art, and the separate nested `sites/detector-registry` repository. Written research and QA Markdown are committed. Included the Android Gradle wrapper scripts/JAR for a reproducible checkout; `android/gradlew` is executable. Staged-file scan found no private-key or token pattern; `android/app/google-services.json` is included as Android Firebase client configuration.
 
 ## Privacy Policy redirect repair (2026-11-19)
 
