@@ -235,17 +235,17 @@ internal class ReelDetector(
             return DetectionOutcome.IdentityNotRevalidated
         }
 
+        val committed = countStore.recordIfNew(
+            appId = profile.appId,
+            itemIdentityHash = candidate.itemIdentityHash,
+            elapsedRealtimeMillis = observation.elapsedRealtimeMillis,
+            wallClockMillis = observation.wallClockMillis,
+            localDateKey = observation.localDateKey,
+            confidence = profile.confidence,
+        )
+        // A failed write leaves the candidate retryable; a stored duplicate is settled.
         candidate.counted = true
-        return if (
-            countStore.recordIfNew(
-                appId = profile.appId,
-                itemIdentityHash = candidate.itemIdentityHash,
-                elapsedRealtimeMillis = observation.elapsedRealtimeMillis,
-                wallClockMillis = observation.wallClockMillis,
-                localDateKey = observation.localDateKey,
-                confidence = profile.confidence,
-            )
-        ) {
+        return if (committed) {
             DetectionOutcome.Counted(
                 appId = profile.appId,
                 localDateKey = observation.localDateKey,

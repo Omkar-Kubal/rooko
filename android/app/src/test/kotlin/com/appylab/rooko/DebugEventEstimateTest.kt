@@ -62,6 +62,32 @@ class DebugEventEstimateTest {
     }
 
     @Test
+    fun tenDistinctSettledReelsProduceTenEstimatedEvents() {
+        val store = MemoryStore()
+        val counter = DebugEventEstimateCounter(store)
+
+        for (index in 0 until 10) {
+            val key = "reel-$index"
+            val at = index * 1_000L
+            assertEquals(
+                DebugEstimateOutcome.Candidate,
+                counter.observe("instagram", key, true, at, "2026-11-23", at),
+            )
+            assertEquals(
+                DebugEstimateOutcome.Counted,
+                counter.observe("instagram", key, true, at + 150L, "2026-11-23", at + 150L),
+            )
+            assertEquals(
+                DebugEstimateOutcome.Stationary,
+                counter.observe("instagram", key, true, at + 300L, "2026-11-23", at + 300L),
+            )
+        }
+
+        assertEquals(10, store.recorded)
+        assertEquals(CountConfidence.ESTIMATED, store.lastConfidence)
+    }
+
+    @Test
     fun transientLabelsProduceOnlyAProcessLocalDigest() {
         val one = DebugTextKeyHasher("one")
         val two = DebugTextKeyHasher("two")

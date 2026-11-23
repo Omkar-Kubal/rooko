@@ -44,6 +44,8 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _busy = false;
   bool _awaitingAccessibilityReturn = false;
   bool _awaitingOverlayReturn = false;
+  bool _settingsReturnRefreshPending = false;
+  int _trackingRefreshGeneration = 0;
 
   @override
   void initState() {
@@ -71,6 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (state != AppLifecycleState.resumed) return;
     final returnedFromRequestedSettings =
         _awaitingAccessibilityReturn || _awaitingOverlayReturn;
+    if (returnedFromRequestedSettings) _settingsReturnRefreshPending = true;
     unawaited(
       _refreshTracking(afterSettingsReturn: returnedFromRequestedSettings),
     );
@@ -80,33 +83,41 @@ class _SettingsScreenState extends State<SettingsScreen>
     Set<String>? selectedAppIds,
     bool afterSettingsReturn = false,
   }) async {
+    final generation = ++_trackingRefreshGeneration;
     final appIds = selectedAppIds ?? widget.selectedAppIds;
+    final finalizeSettingsReturn =
+        afterSettingsReturn || _settingsReturnRefreshPending;
     try {
       await widget.trackingPlatform.setSelectedApps(appIds);
+      if (!mounted || generation != _trackingRefreshGeneration) return;
       var snapshot = await widget.trackingPlatform.getSnapshot(appIds);
-      if (afterSettingsReturn &&
+      if (!mounted || generation != _trackingRefreshGeneration) return;
+      if (finalizeSettingsReturn &&
           _awaitingOverlayReturn &&
           !snapshot.overlayPermissionGranted &&
           snapshot.bubbleEnabled) {
         await widget.trackingPlatform.setBubbleEnabled(false);
+        if (!mounted || generation != _trackingRefreshGeneration) return;
         snapshot = await widget.trackingPlatform.getSnapshot(appIds);
+        if (!mounted || generation != _trackingRefreshGeneration) return;
       }
-      if (!mounted) return;
       setState(() {
         _snapshot = snapshot;
         _statusUnavailable = false;
-        if (afterSettingsReturn) {
+        if (finalizeSettingsReturn) {
           _awaitingAccessibilityReturn = false;
           _awaitingOverlayReturn = false;
+          _settingsReturnRefreshPending = false;
         }
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || generation != _trackingRefreshGeneration) return;
       setState(() {
         _statusUnavailable = true;
-        if (afterSettingsReturn) {
+        if (finalizeSettingsReturn) {
           _awaitingAccessibilityReturn = false;
           _awaitingOverlayReturn = false;
+          _settingsReturnRefreshPending = false;
         }
       });
     }
@@ -193,13 +204,14 @@ class _SettingsScreenState extends State<SettingsScreen>
       if (accepted != true || !mounted) return;
     }
 
+    final generation = ++_trackingRefreshGeneration;
+    final appIds = Set<String>.of(widget.selectedAppIds);
     setState(() => _busy = true);
     try {
       await widget.trackingPlatform.setBubbleEnabled(enabled);
-      final snapshot = await widget.trackingPlatform.getSnapshot(
-        widget.selectedAppIds,
-      );
-      if (!mounted) return;
+      if (!mounted || generation != _trackingRefreshGeneration) return;
+      final snapshot = await widget.trackingPlatform.getSnapshot(appIds);
+      if (!mounted || generation != _trackingRefreshGeneration) return;
       setState(() => _snapshot = snapshot);
       if (enabled && !snapshot.overlayPermissionGranted) {
         await _openOverlaySettings();

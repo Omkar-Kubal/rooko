@@ -788,6 +788,8 @@ void main() {
     expect(find.byKey(const ValueKey('today')), findsOneWidget);
     final preferences = await SharedPreferences.getInstance();
     expect(preferences.getBool('rooko_onboarding_complete'), isTrue);
+    expect(preferences.getBool('rooko_home_welcome_pending'), isTrue);
+    expect(find.byKey(const ValueKey('new-user-welcome')), findsOneWidget);
   });
 
   testWidgets(
@@ -861,6 +863,7 @@ void main() {
 
     final preferences = await SharedPreferences.getInstance();
     expect(preferences.getBool('rooko_onboarding_complete'), isTrue);
+    expect(preferences.getBool('rooko_home_welcome_pending'), isTrue);
     expect(preferences.getString('rooko_onboarding_question_draft'), isNull);
     expect(preferences.getInt('rooko_onboarding_question_index'), isNull);
     expect(preferences.getStringList('rooko_selected_supported_apps'), [

@@ -5,6 +5,7 @@ import 'package:rooko/core/design_system/app_icons.dart';
 import 'package:rooko/core/models/progress.dart';
 import 'package:rooko/core/platform/tracking_platform.dart';
 import 'package:rooko/features/today/today_home_screen.dart';
+import 'package:rooko/features/today/welcome_overlay.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -69,6 +70,116 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Accessibility access'), findsOneWidget);
+  });
+
+  testWidgets('first-run welcome closes once and stays dismissed', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'rooko_home_welcome_pending': true,
+    });
+    await _pumpToday(tester, FakeTodayTrackingPlatform());
+
+    expect(find.byKey(const ValueKey('new-user-welcome')), findsOneWidget);
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.byKey(const ValueKey('welcome-confetti')), findsNothing);
+    expect(find.text('Welcome to\nRooko'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('welcome-continue')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('new-user-welcome')), findsNothing);
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getBool('rooko_home_welcome_pending'), isFalse);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpToday(tester, FakeTodayTrackingPlatform());
+    expect(find.byKey(const ValueKey('new-user-welcome')), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
+  });
+
+  testWidgets('welcome close control clears the first-run flag', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'rooko_home_welcome_pending': true,
+    });
+    await _pumpToday(tester, FakeTodayTrackingPlatform());
+    await tester.tap(find.byKey(const ValueKey('welcome-close')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('new-user-welcome')), findsNothing);
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getBool('rooko_home_welcome_pending'), isFalse);
+  });
+
+  testWidgets('Android Back dismisses the welcome', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'rooko_home_welcome_pending': true,
+    });
+    await _pumpToday(tester, FakeTodayTrackingPlatform());
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('new-user-welcome')), findsNothing);
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getBool('rooko_home_welcome_pending'), isFalse);
+  });
+
+  testWidgets('tapping outside the welcome sheet dismisses it', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'rooko_home_welcome_pending': true,
+    });
+    await _pumpToday(tester, FakeTodayTrackingPlatform());
+    await tester.tapAt(const Offset(216, 40));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(BottomSheet), findsNothing);
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getBool('rooko_home_welcome_pending'), isFalse);
+  });
+
+  testWidgets('welcome confetti pauses in background and resumes once', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: const MediaQuery(
+          data: MediaQueryData(disableAnimations: false),
+          child: Scaffold(body: WelcomeBottomSheet()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 240));
+    expect(find.byKey(const ValueKey('welcome-confetti')), findsOneWidget);
+    expect(tester.hasRunningAnimations, isTrue);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    expect(tester.hasRunningAnimations, isFalse);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(tester.hasRunningAnimations, isTrue);
+    await tester.pumpAndSettle();
+    expect(tester.hasRunningAnimations, isFalse);
+  });
+
+  testWidgets('reduced motion omits welcome confetti', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: const MediaQuery(
+          data: MediaQueryData(disableAnimations: true),
+          child: Scaffold(body: WelcomeBottomSheet()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('welcome-confetti')), findsNothing);
+    expect(find.byKey(const ValueKey('welcome-continue')), findsOneWidget);
   });
 
   testWidgets('X collapses the access wall to a banner with an Allow action', (

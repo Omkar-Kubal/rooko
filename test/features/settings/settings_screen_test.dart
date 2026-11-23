@@ -37,25 +37,10 @@ void main() {
       expect(find.textContaining('partial'), findsNothing);
       expect(find.textContaining('confirmed'), findsNothing);
 
-      for (final title in [
-        'Export data',
-        'Delete local data',
-        'Help & diagnostics',
-      ]) {
-        await tester.scrollUntilVisible(
-          find.text(title),
-          120,
-          scrollable: find.byType(Scrollable).first,
-        );
-        expect(find.text(title), findsOneWidget);
-        final tile = tester.widget<ListTile>(
-          find
-              .ancestor(of: find.text(title), matching: find.byType(ListTile))
-              .first,
-        );
-        expect(tile.enabled, isFalse);
-        expect(tile.onTap, isNull);
-      }
+      expect(find.text('Export data'), findsNothing);
+      expect(find.text('Delete local data'), findsNothing);
+      expect(find.text('Help & diagnostics'), findsNothing);
+      expect(find.text('Help & Feedback'), findsOneWidget);
       for (final text in ['Rooko', 'Version 1.0.0', 'Privacy Policy']) {
         await tester.scrollUntilVisible(
           find.text(text),
@@ -67,22 +52,25 @@ void main() {
     },
   );
 
-  testWidgets('explains the combined counter total when enabled', (
+  testWidgets('floating counter shows overlay access status when enabled', (
     tester,
   ) async {
     final platform = FakeSettingsPlatform()
-      ..snapshot = _snapshot(bubbleEnabled: true);
+      ..snapshot = _snapshot(
+        bubbleEnabled: true,
+        overlayPermissionGranted: true,
+      );
     await _pumpSettings(tester, platform);
 
-    expect(
-      find.text(
-        'The counter shows the shared daily total across selected apps.',
-      ),
-      findsOneWidget,
+    final toggle = tester.widget<SwitchListTile>(
+      find.byKey(const ValueKey('floating-counter-toggle')),
     );
+    expect(toggle.value, isTrue);
+    expect(find.text('Overlay access on'), findsOneWidget);
+    expect(find.textContaining('The counter shows'), findsNothing);
   });
 
-  testWidgets('distinguishes granted access from unsupported app versions', (
+  testWidgets('access status is separate from app-version support', (
     tester,
   ) async {
     final platform = FakeSettingsPlatform()
@@ -96,13 +84,8 @@ void main() {
     await _pumpSettings(tester, platform, selectedAppIds: {'instagram'});
 
     expect(find.text('On'), findsOneWidget);
-    expect(find.text('1 selected · 0 supported'), findsOneWidget);
-    expect(
-      find.text(
-        'No selected app version is supported yet. The counter stays hidden on feeds.',
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('1 selected'), findsOneWidget);
+    expect(find.textContaining('supported yet'), findsNothing);
   });
 
   testWidgets(
@@ -121,7 +104,7 @@ void main() {
       await _pumpSettings(tester, platform, selectedAppIds: {'instagram'});
 
       expect(find.byKey(const ValueKey('debug-counting-toggle')), findsNothing);
-      expect(find.text('1 selected · 1 ready to count'), findsOneWidget);
+      expect(find.text('1 selected'), findsOneWidget);
     },
   );
 
@@ -165,10 +148,11 @@ void main() {
           .value,
       isTrue,
     );
-    expect(selectedApps, {'instagram', 'youtube'});
-    expect(platform.selectedApps, {'instagram', 'youtube'});
-    await tester.tap(find.text('Done'));
+    expect(selectedApps, isNull);
+    expect(platform.selectedApps, {'instagram'});
+    await tester.tap(find.byKey(const ValueKey('settings-apps-apply')));
     await tester.pumpAndSettle();
+    expect(selectedApps, {'instagram', 'youtube'});
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('appearance-selector')),
@@ -189,7 +173,7 @@ void main() {
     await tester.tap(find.text('Apps'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Version 454.0.0.54.77 · Available'), findsOneWidget);
+    expect(find.text('Version 454.0.0.54.77'), findsOneWidget);
     expect(find.text('Available'), findsNothing);
   });
 
@@ -201,11 +185,11 @@ void main() {
     await _pumpSettings(tester, platform);
 
     await tester.scrollUntilVisible(
-      find.text('Set up access'),
+      find.text('Review details'),
       120,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('Set up access'));
+    await tester.tap(find.text('Review details'));
     await tester.pumpAndSettle();
     expect(platform.accessibilitySettingsCalls, 0);
     expect(
@@ -213,7 +197,12 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.text('I understand how this access will be used.'));
+    final acknowledgement = find.text(
+      'I understand how this access will be used.',
+    );
+    await tester.ensureVisible(acknowledgement);
+    await tester.pumpAndSettle();
+    await tester.tap(acknowledgement);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();

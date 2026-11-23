@@ -40,7 +40,6 @@ internal object DailyVerificationPolicy {
             gap in 0..MAX_CHECKPOINT_GAP_MILLIS &&
             environment.nowMillis >= candidate.startedAtMillis &&
             candidate.timeZoneId == environment.timeZoneId &&
-            candidate.offsetSeconds == environment.offsetSeconds &&
             candidate.selectedAppFingerprint == environment.selectedAppFingerprint &&
             candidate.profileFingerprint == environment.profileFingerprint &&
             candidate.processInstanceId == environment.processInstanceId

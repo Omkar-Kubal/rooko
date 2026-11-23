@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -15,6 +14,7 @@ import '../progress/progress_screen.dart';
 import '../settings/settings_screen.dart';
 import 'rook_mascot.dart';
 import 'rook_state.dart';
+import 'welcome_overlay.dart';
 
 enum _HomeDestination { today, progress, settings }
 
@@ -42,9 +42,15 @@ class _TodayHomeScreenState extends State<TodayHomeScreen>
   _HomeDestination _destination = _HomeDestination.today;
   List<String> _selectedAppIds = [];
   bool _accessWallDismissed = false;
+  bool _homeWelcomePending = false;
+  bool _welcomeSheetScheduled = false;
+  bool _welcomeSheetOpen = false;
   TrackingSnapshot? _trackingSnapshot;
   bool _trackingUnavailable = false;
   int _lastHandledFeedExitAtMillis = 0;
+  int _trackingRefreshGeneration = 0;
+  int _selectedAppsMutationGeneration = 0;
+  Future<void> _selectedAppsWriteQueue = Future<void>.value();
   RookRecoveryWindow? _recoveryWindow;
   Timer? _recoveryTimer;
   Timer? _midnightRefreshTimer;
@@ -62,6 +68,7 @@ class _TodayHomeScreenState extends State<TodayHomeScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _trackingRefreshGeneration++;
     _recoveryTimer?.cancel();
     _midnightRefreshTimer?.cancel();
     super.dispose();
@@ -72,10 +79,12 @@ class _TodayHomeScreenState extends State<TodayHomeScreen>
     if (state == AppLifecycleState.resumed) {
       _scheduleMidnightRefresh();
       _refreshTracking();
+      _scheduleWelcomeSheet();
     }
   }
 
   Future<void> _loadSettings() async {
+    final mutationGeneration = _selectedAppsMutationGeneration;
     try {
       final preferences = await SharedPreferences.getInstance();
       final savedAppIds =
@@ -86,29 +95,32 @@ class _TodayHomeScreenState extends State<TodayHomeScreen>
               .toSet()
               .toList()
             ..sort();
-      final normalizedSavedAppIds = savedAppIds.toSet().toList()..sort();
-      if (!listEquals(selectedAppIds, normalizedSavedAppIds)) {
-        await preferences.setStringList(_selectedAppsKey, selectedAppIds);
-      }
       if (!mounted) return;
       setState(() {
-        _selectedAppIds = selectedAppIds;
+        if (mutationGeneration == _selectedAppsMutationGeneration) {
+          _selectedAppIds = selectedAppIds;
+        }
         _accessWallDismissed =
             preferences.getBool(_accessWallDismissedKey) ?? false;
+        _homeWelcomePending =
+            preferences.getBool('rooko_home_welcome_pending') ?? false;
       });
+      _scheduleWelcomeSheet();
     } catch (_) {
       // Keep Today usable if local settings cannot be read.
     }
   }
 
   Future<void> _refreshTracking() async {
+    final generation = ++_trackingRefreshGeneration;
     await _settingsReady;
-    if (!mounted) return;
+    if (!mounted || generation != _trackingRefreshGeneration) return;
     final appIds = _selectedAppIds.toSet();
     try {
       await widget.trackingPlatform.setSelectedApps(appIds);
+      if (!mounted || generation != _trackingRefreshGeneration) return;
       final snapshot = await widget.trackingPlatform.getSnapshot(appIds);
-      if (!mounted) return;
+      if (!mounted || generation != _trackingRefreshGeneration) return;
       _acceptFeedExit(snapshot);
       final accessIsReady =
           snapshot.consentAcknowledged &&
@@ -117,15 +129,17 @@ class _TodayHomeScreenState extends State<TodayHomeScreen>
           (!snapshot.bubbleEnabled || snapshot.overlayPermissionGranted);
       if (accessIsReady && _accessWallDismissed) {
         final preferences = await SharedPreferences.getInstance();
+        if (!mounted || generation != _trackingRefreshGeneration) return;
         await preferences.setBool(_accessWallDismissedKey, false);
       }
+      if (!mounted || generation != _trackingRefreshGeneration) return;
       setState(() {
         _trackingSnapshot = snapshot;
         _trackingUnavailable = false;
         if (accessIsReady) _accessWallDismissed = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || generation != _trackingRefreshGeneration) return;
       setState(() => _trackingUnavailable = true);
     }
   }
@@ -283,17 +297,67 @@ class _TodayHomeScreenState extends State<TodayHomeScreen>
     setState(() => _accessWallDismissed = true);
   }
 
+  Future<void> _dismissHomeWelcome() async {
+    if (!mounted || !_homeWelcomePending) return;
+    setState(() => _homeWelcomePending = false);
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setBool('rooko_home_welcome_pending', false);
+    } catch (_) {
+      // The welcome can still close if local storage is unavailable.
+    }
+  }
+
+  void _scheduleWelcomeSheet() {
+    if (!mounted ||
+        !_homeWelcomePending ||
+        _welcomeSheetScheduled ||
+        _welcomeSheetOpen) {
+      return;
+    }
+    _welcomeSheetScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _welcomeSheetScheduled = false;
+      final lifecycle = WidgetsBinding.instance.lifecycleState;
+      if (!mounted ||
+          !_homeWelcomePending ||
+          _welcomeSheetOpen ||
+          (lifecycle != null && lifecycle != AppLifecycleState.resumed)) {
+        return;
+      }
+      _welcomeSheetOpen = true;
+      try {
+        await showWelcomeBottomSheet(context);
+        if (mounted) await _dismissHomeWelcome();
+      } catch (_) {
+        // Keep the note pending if the route could not be presented.
+      } finally {
+        _welcomeSheetOpen = false;
+      }
+    });
+  }
+
   Future<void> _saveSelectedApps(Set<String> appIds) async {
+    final mutationGeneration = ++_selectedAppsMutationGeneration;
     final validIds = appIds
         .where((id) => SupportedApp.byId(id) != null)
         .toSet();
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setStringList(
-      _selectedAppsKey,
-      validIds.toList()..sort(),
-    );
-    if (!mounted) return;
-    setState(() => _selectedAppIds = validIds.toList()..sort());
+    final sortedIds = validIds.toList()..sort();
+    final write = _selectedAppsWriteQueue.then((_) async {
+      if (mutationGeneration != _selectedAppsMutationGeneration) return;
+      await preferences.setStringList(_selectedAppsKey, sortedIds);
+    });
+    _selectedAppsWriteQueue = write.catchError((Object _) {});
+    try {
+      await write;
+    } catch (_) {
+      return;
+    }
+    if (!mounted || mutationGeneration != _selectedAppsMutationGeneration) {
+      return;
+    }
+    setState(() => _selectedAppIds = sortedIds);
     _refreshTracking();
   }
 

@@ -22,6 +22,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.ArrayDeque
 import java.util.UUID
+import java.util.concurrent.Executors
 
 /** Confirms selected-app exposures only when the current root revalidates item identity. */
 class SelectedAppAccessibilityService : AccessibilityService() {
@@ -34,6 +35,25 @@ class SelectedAppAccessibilityService : AccessibilityService() {
     private data class ProbeSnapshot(
         val viewIds: Set<String>,
         val nodeFeatures: List<StructuralNodeFeature>,
+    )
+
+    private data class DebugFeedSnapshot(
+        val feedVisible: Boolean,
+        val commentsVisible: Boolean,
+        val transientGap: Boolean,
+        val itemNode: AccessibilityNodeInfo? = null,
+    )
+
+    private data class PendingDebugItemScan(
+        val profile: DebugTextProfile,
+        val itemNode: AccessibilityNodeInfo,
+        val sampledAtMillis: Long,
+        val generation: Long,
+    )
+
+    private data class PendingDebugRescan(
+        val profile: DebugTextProfile,
+        val generation: Long,
     )
 
     private data class CurrentRootSnapshot(
@@ -57,8 +77,16 @@ class SelectedAppAccessibilityService : AccessibilityService() {
     private val feedFingerprinters = mutableMapOf<String, FeedItemFingerprinter>()
     private val observedFeedTimeTracker = ObservedFeedTimeTracker()
     private val confirmationChecks = mutableMapOf<String, Runnable>()
-    private val debugChecks = mutableMapOf<String, Runnable>()
+    private val debugChecks = PendingEstimateRechecks()
+    private val estimatedEventScanPolicy = EstimatedEventScanPolicy(250L)
     private val debugRetryStartedAt = mutableMapOf<String, Long>()
+    private val debugPersistenceRetryAttempts = mutableMapOf<String, Int>()
+    private val debugItemScanRequests = CoalescedItemScanRequests<PendingDebugRescan>()
+    private var debugStateGeneration = 0L
+    private val floatingCounterVisibilityGrace = FloatingCounterVisibilityGrace(
+        graceMillis = FLOATING_COUNTER_SCAN_GRACE_MILLIS,
+    )
+    private val floatingCounterTotalCache = FloatingCounterTotalCache()
     private var uniqueIdRelationTracker: UniqueIdRelationTracker? = null
     private var alternativeIdentityRelationProbe: AlternativeIdentityRelationProbe? = null
     private var selectedAppIds: Set<String> = emptySet()
@@ -80,6 +108,11 @@ class SelectedAppAccessibilityService : AccessibilityService() {
     private var observedFeedTimeTarget: FeedTimeTarget? = null
     private var screenOffResumeTarget: FeedTimeTarget? = null
     private var observedFeedHeartbeatScheduled = false
+    private var floatingCounterGraceRunnable: Runnable? = null
+    private var floatingCounterGraceAppId: String? = null
+    private var activeCounterFeedAppId: String? = null
+    private var floatingCounterTotalLoadToken = 0L
+    private var floatingCounterTotalLoadInFlight = false
     private var screenStateReceiverRegistered = false
     private val screenStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -178,7 +211,22 @@ class SelectedAppAccessibilityService : AccessibilityService() {
         val packageName = event.packageName?.toString()
         // The application overlay emits events under our own package. The
         // Activity hides it in onResume; its own view events must not close it.
-        if (packageName == this.packageName) return
+        if (packageName == this.packageName) {
+            DetectorStructuralProbe.flushEstimatorSummary(this)
+            return
+        }
+        val activeCounterPackageName = activeCounterFeedAppId?.let { appId ->
+            SupportedAppsNative.byId(appId)?.packageName
+        }
+        if (FloatingCounterForegroundPolicy.shouldHide(
+                activeCounterPackageName = activeCounterPackageName,
+                eventPackageName = packageName,
+                windowStateChanged =
+                    event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
+            )
+        ) {
+            hideFloatingCounterImmediately()
+        }
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             if (observedFeedTimeTarget?.packageName != packageName) {
                 stopObservedFeedTime()
@@ -193,7 +241,7 @@ class SelectedAppAccessibilityService : AccessibilityService() {
                     .forEach(::reportValidatedFeedExit)
             }
             if (packageName !in SupportedAppsNative.all.map { it.packageName }) {
-                floatingCounter?.hide()
+                hideFloatingCounterImmediately()
             }
             activeItems.values.toList()
                 .filter {
@@ -210,7 +258,7 @@ class SelectedAppAccessibilityService : AccessibilityService() {
         val definition = SupportedAppsNative.all.firstOrNull {
             it.packageName == packageName && it.appId in selectedAppIds
         } ?: run {
-            floatingCounter?.hide()
+            hideFloatingCounterImmediately()
             if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
                 stopObservedFeedTime()
             }
@@ -281,11 +329,19 @@ class SelectedAppAccessibilityService : AccessibilityService() {
 
         if (profile == null) {
             if (debugProfile != null) {
-                scanDebugEstimate(debugProfile)
+                if (!estimatedEventScanPolicy.shouldScan(
+                        event.eventType, SystemClock.elapsedRealtime(),
+                    )
+                ) return
+                scanDebugEstimate(
+                    debugProfile,
+                    definiteWindowTransition =
+                        event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
+                )
                 return
             }
             stopObservedFeedTime(definition.appId)
-            floatingCounter?.hide()
+            hideFloatingCounterImmediately()
             recognizedFeedAppIds.remove(definition.appId)
             clearActiveItem(definition.appId)
             detector?.clearCandidate(definition.appId)
@@ -394,7 +450,7 @@ class SelectedAppAccessibilityService : AccessibilityService() {
     override fun onInterrupt() {
         screenOffResumeTarget = null
         stopObservedFeedTime()
-        floatingCounter?.hide()
+        hideFloatingCounterImmediately()
         clearDebugState()
         serviceHealth.onInterrupt()
         recordCoverageGap()
@@ -407,9 +463,10 @@ class SelectedAppAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        DetectorStructuralProbe.flushEstimatorSummary(this)
         stopObservedFeedTime()
         unregisterScreenStateReceiver()
-        floatingCounter?.hide()
+        hideFloatingCounterImmediately()
         clearDebugState()
         floatingCounter = null
         if (serviceHealth.isOperational) recordCoverageGap()
@@ -552,7 +609,7 @@ class SelectedAppAccessibilityService : AccessibilityService() {
         )
         if (appsToRefresh.isEmpty()) {
             if (!counter.isShowing || !estimatedCountingEnabled()) return
-            val root = rootInActiveWindow ?: run { counter.hide(); return }
+            val root = rootInActiveWindow ?: run { hideFloatingCounterImmediately(); return }
             val packageName = root.packageName?.toString()
             val app = SupportedAppsNative.all.firstOrNull {
                 it.packageName == packageName && it.appId in selectedAppIds
@@ -563,11 +620,14 @@ class SelectedAppAccessibilityService : AccessibilityService() {
             ) DebugTextProfiles.forVersion(packageName, version) else null
             if (profile == null) {
                 root.recycle()
-                counter.hide()
+                hideFloatingCounterImmediately()
                 return
             }
-            val (feedVisible, _) = collectDebugFeedAndKey(root, profile)
-            updateDebugFloatingCounter(profile, feedVisible)
+            val snapshot = collectDebugFeedSnapshot(root, profile)
+            if (snapshot.feedVisible && !snapshot.commentsVisible) {
+                updateDebugFloatingCounter(profile, recognizedFeed = true)
+            }
+            else hideFloatingCounterImmediately()
             return
         }
 
@@ -575,7 +635,7 @@ class SelectedAppAccessibilityService : AccessibilityService() {
         if (profiles.size != appsToRefresh.size) {
             val availableAppIds = profiles.mapTo(mutableSetOf()) { it.appId }
             (appsToRefresh - availableAppIds).forEach(recognizedFeedAppIds::remove)
-            counter.hide()
+            hideFloatingCounterImmediately()
             return
         }
         profiles.forEach { profile -> updateFloatingCounter(profile, recognizedFeed = true) }
@@ -622,24 +682,30 @@ class SelectedAppAccessibilityService : AccessibilityService() {
             return
         }
         activeItems[profile.appId] = ActiveItem(profile, index, identityHash)
-        val outcome = detector?.observe(
-            ReelObservation(
-                packageName = profile.packageName,
-                versionName = profile.versionName,
-                isFeedVisible = true,
-                itemIdentity = ItemIdentity(identityHash, profile.identityStrategy),
-                transitionObserved = transitionObserved,
-                feedEntryObserved = feedEntryObserved,
-                identityRevalidatedAtCurrentRoot =
-                    profile.identityStrategy in setOf(
-                        ItemIdentityStrategy.STABLE_OPAQUE_ACCESSIBILITY_TOKEN,
-                        ItemIdentityStrategy.STRUCTURAL_NODE_PAIR,
-                    ),
-                elapsedRealtimeMillis = now,
-                wallClockMillis = System.currentTimeMillis(),
-                localDateKey = LocalDate.now().toString(),
-            ),
-        )
+        val outcome = try {
+            detector?.observe(
+                ReelObservation(
+                    packageName = profile.packageName,
+                    versionName = profile.versionName,
+                    isFeedVisible = true,
+                    itemIdentity = ItemIdentity(identityHash, profile.identityStrategy),
+                    transitionObserved = transitionObserved,
+                    feedEntryObserved = feedEntryObserved,
+                    identityRevalidatedAtCurrentRoot =
+                        profile.identityStrategy in setOf(
+                            ItemIdentityStrategy.STABLE_OPAQUE_ACCESSIBILITY_TOKEN,
+                            ItemIdentityStrategy.STRUCTURAL_NODE_PAIR,
+                        ),
+                    elapsedRealtimeMillis = now,
+                    wallClockMillis = System.currentTimeMillis(),
+                    localDateKey = LocalDate.now().toString(),
+                ),
+            )
+        } catch (_: Exception) {
+            // A failed Room write leaves the detector candidate uncounted and retryable.
+            scheduleDwellCheck(profile, index, identityHash)
+            return
+        }
         if (previous?.index != index || outcome == DetectionOutcome.CandidateStarted) {
             scheduleDwellCheck(profile, index, identityHash)
         }
@@ -654,6 +720,10 @@ class SelectedAppAccessibilityService : AccessibilityService() {
             stopObservedFeedTime()
             if (!isCurrentTimeFeedVisible(target)) return
             observedFeedTimeTarget = target
+            observeFeedTimeAt(SystemClock.elapsedRealtime(), target)
+        } else {
+            // Accessibility feed events are additional confirmed endpoints. Sampling here
+            // captures short sessions that can fall between heartbeat callbacks.
             observeFeedTimeAt(SystemClock.elapsedRealtime(), target)
         }
         scheduleObservedFeedHeartbeat()
@@ -709,13 +779,13 @@ class SelectedAppAccessibilityService : AccessibilityService() {
             root.recycle()
             return false
         }
-        val viewIds = collectFeedMarkerIds(root, target.packageName)
-        return if (target.estimated) {
-            DebugTextProfiles.forVersion(target.packageName, target.versionName)
-                ?.isRecognizedFeed(viewIds) == true
-        } else {
-            target.feedMarkerIds.isNotEmpty() && viewIds.containsAll(target.feedMarkerIds)
+        if (target.estimated) {
+            val profile = DebugTextProfiles.forVersion(target.packageName, target.versionName)
+                ?: run { root.recycle(); return false }
+            val snapshot = collectDebugFeedSnapshot(root, profile)
+            return snapshot.feedVisible && !snapshot.commentsVisible
         }
+        return hasAllVisibleResourceIds(root, target.packageName, target.feedMarkerIds)
     }
 
     private fun registerScreenStateReceiver() {
@@ -774,40 +844,12 @@ class SelectedAppAccessibilityService : AccessibilityService() {
         }
     }
 
-    /** Reads only resource IDs; time sampling never inspects labels or item identity. */
-    private fun collectFeedMarkerIds(
-        root: AccessibilityNodeInfo,
-        resourcePackage: String,
-    ): Set<String> {
-        val viewIds = mutableSetOf<String>()
-        val queue = ArrayDeque<AccessibilityNodeInfo>()
-        queue.add(root)
-        var visited = 0
-        while (queue.isNotEmpty() && visited < MAX_NODES_TO_INSPECT) {
-            val node = queue.removeFirst()
-            if (node.isVisibleToUser) {
-                StructuralProbeFormatter.resourceNameFor(
-                    node.viewIdResourceName,
-                    resourcePackage,
-                )?.let(viewIds::add)
-            }
-            for (index in 0 until node.childCount) {
-                node.getChild(index)?.let(queue::addLast)
-            }
-            node.recycle()
-            visited++
-        }
-        val complete = queue.isEmpty()
-        while (queue.isNotEmpty()) queue.removeFirst().recycle()
-        return if (complete) viewIds else emptySet()
-    }
-
     private fun observeOutsideFeed(
         profile: AppDetectorProfile,
         validatedFeedExit: Boolean,
     ) {
         stopObservedFeedTime(profile.appId)
-        floatingCounter?.hide()
+        hideFloatingCounterImmediately()
         if (validatedFeedExit) reportValidatedFeedExit(profile.appId)
         cancelDwellCheck(profile.appId)
         val now = SystemClock.elapsedRealtime()
@@ -921,18 +963,25 @@ class SelectedAppAccessibilityService : AccessibilityService() {
                 return@Runnable
             }
 
-            detector?.observe(
-                ReelObservation(
-                    packageName = profile.packageName,
-                    versionName = profile.versionName,
-                    isFeedVisible = true,
-                    itemIdentity = ItemIdentity(identityHash, profile.identityStrategy),
-                    identityRevalidatedAtCurrentRoot = true,
-                    elapsedRealtimeMillis = now,
-                    wallClockMillis = System.currentTimeMillis(),
-                    localDateKey = LocalDate.now().toString(),
-                ),
-            )
+            val outcome = try {
+                detector?.observe(
+                    ReelObservation(
+                        packageName = profile.packageName,
+                        versionName = profile.versionName,
+                        isFeedVisible = true,
+                        itemIdentity = ItemIdentity(identityHash, profile.identityStrategy),
+                        identityRevalidatedAtCurrentRoot = true,
+                        elapsedRealtimeMillis = now,
+                        wallClockMillis = System.currentTimeMillis(),
+                        localDateKey = LocalDate.now().toString(),
+                    ),
+                )
+            } catch (_: Exception) {
+                // Keep the same candidate and retry only after another bounded dwell interval.
+                scheduleDwellCheck(profile, index, identityHash)
+                return@Runnable
+            }
+            if (outcome is DetectionOutcome.Counted) recordFloatingCounterCountedEvent()
             updateFloatingCounter(profile, recognizedFeed = true)
         }
         confirmationChecks[profile.appId] = check
@@ -968,27 +1017,26 @@ class SelectedAppAccessibilityService : AccessibilityService() {
                 recognizedFeed = recognizedFeed,
             )
         ) {
-            floatingCounter?.hide()
+            hideFloatingCounterImmediately()
             if (!profileAvailable) recognizedFeedAppIds.remove(profile.appId)
             return
         }
-        val dailyTotal = countStore
-            ?.countsFor(localDate.toString(), selectedAppIds)
-            ?.values
-            ?.sumOf { it.countedCount }
-            ?: return
-        floatingCounter?.show(dailyTotal)
+        ensureFloatingCounterTotalScope()
+        activeCounterFeedAppId = profile.appId
+        floatingCounter?.show(floatingCounterTotalCache.total)
     }
 
     private fun estimatedCountingEnabled(): Boolean =
         trackingPreferences().getBoolean(CONSENT_ACKNOWLEDGED_KEY, false)
 
     private fun clearDebugState() {
-        debugChecks.values.forEach(handler::removeCallbacks)
-        debugChecks.clear()
+        debugStateGeneration++
+        debugChecks.clear(handler::removeCallbacks)
         debugRetryStartedAt.clear()
+        debugPersistenceRetryAttempts.clear()
+        debugItemScanRequests.discardAllPending()
         debugCounter?.clear()
-        floatingCounter?.hide()
+        hideFloatingCounterImmediately()
     }
 
     private fun seedVisibleEstimateOnConnect() {
@@ -1012,8 +1060,10 @@ class SelectedAppAccessibilityService : AccessibilityService() {
             verifiedDetectorRegistry,
         )
         if (validatedProfile != null) {
-            val viewIds = collectFeedMarkerIds(root, packageName)
-            if (validatedProfile.isRecognizedFeed(viewIds)) {
+            val now = SystemClock.elapsedRealtime()
+            val snapshot = collectCurrentRootSnapshot(root, validatedProfile, now)
+            if (validatedProfile.isRecognizedFeed(snapshot.viewIds)) {
+                recognizedFeedAppIds.add(validatedProfile.appId)
                 startObservedFeedTime(
                     FeedTimeTarget(
                         appId = validatedProfile.appId,
@@ -1023,6 +1073,35 @@ class SelectedAppAccessibilityService : AccessibilityService() {
                         estimated = false,
                     ),
                 )
+                updateFloatingCounter(validatedProfile, recognizedFeed = true)
+                snapshot.itemIdentityHash?.let { identityHash ->
+                    activeItems[validatedProfile.appId] = ActiveItem(
+                        validatedProfile,
+                        NO_PAGER_INDEX,
+                        identityHash,
+                    )
+                    // Seed the visible identity without transition or feed-entry evidence.
+                    runCatching {
+                        detector?.observe(
+                            ReelObservation(
+                                packageName = validatedProfile.packageName,
+                                versionName = validatedProfile.versionName,
+                                isFeedVisible = true,
+                                itemIdentity = ItemIdentity(
+                                    identityHash,
+                                    validatedProfile.identityStrategy,
+                                ),
+                                identityRevalidatedAtCurrentRoot = true,
+                                elapsedRealtimeMillis = now,
+                                wallClockMillis = System.currentTimeMillis(),
+                                localDateKey = LocalDate.now().toString(),
+                            ),
+                        )
+                    }.onFailure {
+                        activeItems.remove(validatedProfile.appId)
+                        detector?.clearCandidate(validatedProfile.appId)
+                    }
+                }
             }
             return
         }
@@ -1030,27 +1109,27 @@ class SelectedAppAccessibilityService : AccessibilityService() {
             root.recycle()
             return
         }
-        val (feedVisible, key) = collectDebugFeedAndKey(root, profile)
-        if (!feedVisible) return
-        startObservedFeedTime(
-            FeedTimeTarget(
-                appId = profile.appId,
-                packageName = profile.packageName,
-                versionName = profile.versionName,
-                feedMarkerIds = profile.feedMarkerIds,
-                estimated = true,
-            ),
-        )
+        val snapshot = collectDebugFeedSnapshot(root, profile, includeItem = true) {
+            cancelFloatingCounterHideCheck()
+            recognizedFeedAppIds.add(profile.appId)
+            updateDebugFloatingCounter(profile, recognizedFeed = true)
+        }
+        if (!snapshot.feedVisible || snapshot.commentsVisible) return
+        startObservedFeedTime(debugFeedTimeTarget(profile))
         debugCounter?.suppressInitialItem(profile.appId)
-        debugCounter?.observe(
-            profile.appId, key, true, SystemClock.elapsedRealtime(),
-            LocalDate.now().toString(), System.currentTimeMillis(),
-        )
-        updateDebugFloatingCounter(profile, true)
+        val itemNode = snapshot.itemNode
+        if (itemNode != null) {
+            scanDebugItemKeyAsync(profile, itemNode, SystemClock.elapsedRealtime())
+        } else {
+            val now = SystemClock.elapsedRealtime()
+            processDebugEstimateKey(profile, null, now)
+        }
     }
 
-    private fun scanDebugEstimate(profile: DebugTextProfile) {
-        debugChecks.remove(profile.appId)?.let(handler::removeCallbacks)
+    private fun scanDebugEstimate(
+        profile: DebugTextProfile,
+        definiteWindowTransition: Boolean = false,
+    ) {
         if (!estimatedCountingEnabled() || profile.appId !in selectedAppIds ||
             installedVersion(profile.packageName) != profile.versionName || !isOperational(this)
         ) {
@@ -1060,52 +1139,326 @@ class SelectedAppAccessibilityService : AccessibilityService() {
         }
 
         val root = rootInActiveWindow
-        val feedAndKey = if (root?.packageName?.toString() == profile.packageName) {
-            collectDebugFeedAndKey(root, profile)
-        } else {
-            root?.recycle()
-            false to null
-        }
-        val (feedVisible, key) = feedAndKey
         val now = SystemClock.elapsedRealtime()
-        if (feedVisible) {
-            startObservedFeedTime(
-                FeedTimeTarget(
-                    appId = profile.appId,
-                    packageName = profile.packageName,
-                    versionName = profile.versionName,
-                    feedMarkerIds = profile.feedMarkerIds,
-                    estimated = true,
-                ),
-            )
-        } else {
+        if (root == null) {
+            recordEstimatorProbe(profile, EstimatorProbeCategory.ROOT_MISSING)
             stopObservedFeedTime(profile.appId)
+            observeEstimatedFeedOutside(profile, now)
+            if (definiteWindowTransition) hideFloatingCounterImmediately()
+            else deferFloatingCounterHide(profile)
+            return
         }
-        val outcome = debugCounter?.observe(
-            profile.appId, key, feedVisible, now,
-            LocalDate.now().toString(), System.currentTimeMillis(),
+        val rootPackageName = root.packageName?.toString()
+        if (rootPackageName != profile.packageName) {
+            root.recycle()
+            recordEstimatorProbe(profile, EstimatorProbeCategory.ROOT_PACKAGE_CHANGED)
+            recordEstimatorProbe(
+                profile,
+                if (rootPackageName == this.packageName) {
+                    EstimatorProbeCategory.EVENT_ROOT_OWN_PACKAGE
+                } else {
+                    EstimatorProbeCategory.EVENT_ROOT_OTHER_PACKAGE
+                },
+            )
+            stopObservedFeedTime(profile.appId)
+            observeEstimatedFeedOutside(profile, now)
+            hideFloatingCounterImmediately()
+            return
+        }
+        val snapshot = collectDebugFeedSnapshot(root, profile, includeItem = true) {
+            floatingCounterVisibilityGrace.onRecognizedFeed()
+            cancelFloatingCounterHideCheck()
+            recognizedFeedAppIds.add(profile.appId)
+            updateDebugFloatingCounter(profile, recognizedFeed = true)
+        }
+        recordEstimatorProbe(
+            profile,
+            when {
+                snapshot.commentsVisible -> EstimatorProbeCategory.COMMENTS_SURFACE
+                snapshot.feedVisible -> EstimatorProbeCategory.FEED_RECOGNIZED
+                else -> EstimatorProbeCategory.FEED_NOT_RECOGNIZED
+            },
         )
-        updateDebugFloatingCounter(profile, feedVisible)
+        if (snapshot.commentsVisible || !snapshot.feedVisible) {
+            stopObservedFeedTime(profile.appId)
+            observeEstimatedFeedOutside(profile, now)
+            if (snapshot.transientGap && !definiteWindowTransition) {
+                deferFloatingCounterHide(profile)
+            }
+            else hideFloatingCounterImmediately()
+            return
+        }
+        startObservedFeedTime(debugFeedTimeTarget(profile))
+        val itemNode = snapshot.itemNode
+        if (itemNode != null) {
+            recordEstimatorProbe(profile, EstimatorProbeCategory.ITEM_NODE_FOUND)
+            scanDebugItemKeyAsync(profile, itemNode, now)
+        } else {
+            recordEstimatorProbe(profile, EstimatorProbeCategory.ITEM_NODE_MISSING)
+            processDebugEstimateKey(profile, null, now)
+        }
+    }
+
+    private fun debugFeedTimeTarget(profile: DebugTextProfile) = FeedTimeTarget(
+        appId = profile.appId,
+        packageName = profile.packageName,
+        versionName = profile.versionName,
+        feedMarkerIds = profile.feedMarkerIds,
+        estimated = true,
+    )
+
+    private fun scanDebugItemKeyAsync(
+        profile: DebugTextProfile,
+        itemNode: AccessibilityNodeInfo,
+        sampledAtMillis: Long,
+    ) {
+        val appId = profile.appId
+        recordEstimatorProbe(profile, EstimatorProbeCategory.ITEM_SCAN_STARTED)
+        val generation = debugStateGeneration
+        if (!debugItemScanRequests.request(
+                appId,
+                PendingDebugRescan(profile, generation),
+            )
+        ) {
+            itemNode.recycle()
+            recordEstimatorProbe(profile, EstimatorProbeCategory.ITEM_SCAN_QUEUED)
+            return
+        }
+        val scan = PendingDebugItemScan(
+            profile = profile,
+            itemNode = itemNode,
+            sampledAtMillis = sampledAtMillis,
+            generation = generation,
+        )
+        startDebugItemScan(scan)
+    }
+
+    /** Hash one transient snapshot, then rescan the live root if newer events arrived. */
+    private fun startDebugItemScan(scan: PendingDebugItemScan) {
+        val profile = scan.profile
+        val appId = profile.appId
+        DEBUG_ITEM_SCAN_EXECUTOR.execute {
+            val workerStartedAt = SystemClock.elapsedRealtime()
+            var scanCategory = EstimatorProbeCategory.WORKER_SKIPPED
+            val key = try {
+                val preferences = trackingPreferences()
+                val consented = preferences.getBoolean(CONSENT_ACKNOWLEDGED_KEY, false)
+                val selected = TrackingConsentGate.allowedApps(
+                    preferences.getStringSet(SELECTED_APP_IDS_KEY, emptySet()).orEmpty(),
+                    consented,
+                )
+                if (!consented || appId !in selected ||
+                    installedVersion(profile.packageName) != profile.versionName ||
+                    !isOperational(this) || !isScreenInteractive()
+                ) {
+                    null
+                } else {
+                    val (labels, sponsored) = collectDebugLabels(scan.itemNode)
+                    when {
+                        sponsored -> {
+                            scanCategory = EstimatorProbeCategory.SPONSORED_ITEM
+                            null
+                        }
+                        labels.isEmpty() -> {
+                            scanCategory = EstimatorProbeCategory.LABELS_EMPTY
+                            null
+                        }
+                        else -> debugHasher?.digest(labels).also { digest ->
+                            scanCategory = if (digest == null) {
+                                EstimatorProbeCategory.HASH_MISSING
+                            } else {
+                                EstimatorProbeCategory.HASH_AVAILABLE
+                            }
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                scanCategory = EstimatorProbeCategory.WORKER_FAILED
+                null
+            } finally {
+                scan.itemNode.recycle()
+            }
+            val workerElapsed = SystemClock.elapsedRealtime() - workerStartedAt
+            handler.post {
+                try {
+                    if (instance !== this || scan.generation != debugStateGeneration) {
+                        return@post
+                    }
+                    recordEstimatorProbe(profile, scanCategory)
+                    recordEstimatorProbe(
+                        profile,
+                        when {
+                            workerElapsed < 250L -> EstimatorProbeCategory.WORKER_UNDER_250_MS
+                            workerElapsed < 1_000L ->
+                                EstimatorProbeCategory.WORKER_250_TO_999_MS
+                            workerElapsed < 2_000L ->
+                                EstimatorProbeCategory.WORKER_1000_TO_1999_MS
+                            else -> EstimatorProbeCategory.WORKER_2000_MS_OR_MORE
+                        },
+                    )
+                    if (!estimatedCountingEnabled() || appId !in selectedAppIds ||
+                        installedVersion(profile.packageName) != profile.versionName ||
+                        !isOperational(this)
+                    ) return@post
+
+                    val root = rootInActiveWindow
+                    if (root == null) {
+                        recordEstimatorProbe(profile, EstimatorProbeCategory.ROOT_MISSING)
+                        stopObservedFeedTime(appId)
+                        observeEstimatedFeedOutside(profile, SystemClock.elapsedRealtime())
+                        deferFloatingCounterHide(profile)
+                        discardPendingDebugItemScans(appId)
+                        return@post
+                    }
+                    val rootPackageName = root.packageName?.toString()
+                    if (rootPackageName != profile.packageName) {
+                        root.recycle()
+                        recordEstimatorProbe(profile, EstimatorProbeCategory.ROOT_PACKAGE_CHANGED)
+                        recordEstimatorProbe(
+                            profile,
+                            if (rootPackageName == this.packageName) {
+                                EstimatorProbeCategory.RESULT_ROOT_OWN_PACKAGE
+                            } else {
+                                EstimatorProbeCategory.RESULT_ROOT_OTHER_PACKAGE
+                            },
+                        )
+                        stopObservedFeedTime(appId)
+                        observeEstimatedFeedOutside(profile, SystemClock.elapsedRealtime())
+                        hideFloatingCounterImmediately()
+                        discardPendingDebugItemScans(appId)
+                        return@post
+                    }
+                    val current = collectDebugFeedSnapshot(root, profile)
+                    if (!current.feedVisible || current.commentsVisible) {
+                        recordEstimatorProbe(
+                            profile,
+                            if (current.commentsVisible) {
+                                EstimatorProbeCategory.COMMENTS_SURFACE
+                            } else {
+                                EstimatorProbeCategory.FEED_REVALIDATION_FAILED
+                            },
+                        )
+                        stopObservedFeedTime(appId)
+                        observeEstimatedFeedOutside(profile, SystemClock.elapsedRealtime())
+                        if (current.transientGap && !current.commentsVisible) {
+                            deferFloatingCounterHide(profile)
+                        } else {
+                            hideFloatingCounterImmediately()
+                        }
+                        discardPendingDebugItemScans(appId)
+                        return@post
+                    }
+                    recordEstimatorProbe(profile, EstimatorProbeCategory.FEED_REVALIDATED)
+                    processDebugEstimateKey(profile, key, scan.sampledAtMillis)
+                } finally {
+                    startNextPendingDebugItemScan(appId)
+                }
+            }
+        }
+    }
+
+    private fun startNextPendingDebugItemScan(appId: String) {
+        val pending = debugItemScanRequests.finish(appId) ?: return
+        if (instance === this && pending.generation == debugStateGeneration) {
+            scanDebugEstimate(pending.profile)
+        }
+    }
+
+    private fun discardPendingDebugItemScans(appId: String) {
+        debugItemScanRequests.discardPending(appId)
+    }
+
+    private fun processDebugEstimateKey(
+        profile: DebugTextProfile,
+        key: String?,
+        now: Long,
+    ) {
+        val outcome = try {
+            debugCounter?.observe(
+                profile.appId,
+                key,
+                feedVisible = true,
+                elapsedRealtimeMillis = now,
+                localDateKey = LocalDate.now().toString(),
+                wallClockMillis = System.currentTimeMillis(),
+            )
+        } catch (_: Exception) {
+            // Leave the candidate intact and retry briefly; later feed events can retry again.
+            DebugEstimateOutcome.PersistenceUnavailable
+        }
+        val probeCategory = when (outcome) {
+            null -> EstimatorProbeCategory.ESTIMATOR_UNAVAILABLE
+            DebugEstimateOutcome.OutsideFeed -> EstimatorProbeCategory.OUTCOME_OUTSIDE_FEED
+            DebugEstimateOutcome.MissingKey -> EstimatorProbeCategory.OUTCOME_MISSING_KEY
+            DebugEstimateOutcome.Candidate -> EstimatorProbeCategory.OUTCOME_CANDIDATE
+            DebugEstimateOutcome.Waiting -> EstimatorProbeCategory.OUTCOME_WAITING
+            DebugEstimateOutcome.Stationary -> EstimatorProbeCategory.OUTCOME_STATIONARY
+            DebugEstimateOutcome.Duplicate -> EstimatorProbeCategory.OUTCOME_DUPLICATE
+            DebugEstimateOutcome.Counted -> EstimatorProbeCategory.OUTCOME_COUNTED
+            DebugEstimateOutcome.PersistenceUnavailable ->
+                EstimatorProbeCategory.OUTCOME_PERSISTENCE_UNAVAILABLE
+            DebugEstimateOutcome.BaselineSeeded -> EstimatorProbeCategory.OUTCOME_BASELINE_SEEDED
+        }
+        recordEstimatorProbe(profile, probeCategory)
+        if (outcome == DebugEstimateOutcome.Counted) recordFloatingCounterCountedEvent()
 
         val delay = when (outcome) {
             DebugEstimateOutcome.Candidate, DebugEstimateOutcome.Waiting -> 150L
             DebugEstimateOutcome.MissingKey -> {
                 val started = debugRetryStartedAt.getOrPut(profile.appId) { now }
-                if (feedVisible && now - started < 3_000L) 250L else null
+                if (now - started < 3_000L) 250L else null
+            }
+            DebugEstimateOutcome.PersistenceUnavailable -> {
+                val attempts = debugPersistenceRetryAttempts.getOrDefault(profile.appId, 0)
+                if (attempts < MAX_DEBUG_PERSISTENCE_RETRIES) {
+                    debugPersistenceRetryAttempts[profile.appId] = attempts + 1
+                    if (attempts == 0) 500L else 1_000L
+                } else {
+                    debugPersistenceRetryAttempts.remove(profile.appId)
+                    null
+                }
             }
             else -> null
         }
         if (outcome != DebugEstimateOutcome.MissingKey) {
             debugRetryStartedAt.remove(profile.appId)
         }
+        if (outcome != DebugEstimateOutcome.PersistenceUnavailable) {
+            debugPersistenceRetryAttempts.remove(profile.appId)
+        }
         if (delay != null) {
-            val check = Runnable { scanDebugEstimate(profile) }
-            debugChecks[profile.appId] = check
-            handler.postDelayed(check, delay)
+            debugChecks.schedule(profile.appId, delay, { check, wait ->
+                handler.postDelayed(check, wait)
+            }) { scanDebugEstimate(profile) }
         }
     }
 
-    private fun updateDebugFloatingCounter(profile: DebugTextProfile, feedVisible: Boolean) {
+    private fun observeEstimatedFeedOutside(profile: DebugTextProfile, now: Long) {
+        debugChecks.cancel(profile.appId, handler::removeCallbacks)
+        debugPersistenceRetryAttempts.remove(profile.appId)
+        debugCounter?.observe(
+            profile.appId,
+            key = null,
+            feedVisible = false,
+            elapsedRealtimeMillis = now,
+            localDateKey = LocalDate.now().toString(),
+            wallClockMillis = System.currentTimeMillis(),
+        )
+    }
+
+    private fun recordEstimatorProbe(
+        profile: DebugTextProfile,
+        outcome: EstimatorProbeCategory,
+    ) {
+        DetectorStructuralProbe.recordEstimatorOutcome(
+            this,
+            appId = profile.appId,
+            versionName = profile.versionName,
+            outcome = outcome,
+        )
+    }
+
+    private fun updateDebugFloatingCounter(profile: DebugTextProfile, recognizedFeed: Boolean) {
         val preferences = trackingPreferences()
         if (!FloatingCounterPolicy.canShow(
                 enabled = preferences.getBoolean(BUBBLE_ENABLED_KEY, false),
@@ -1116,53 +1469,305 @@ class SelectedAppAccessibilityService : AccessibilityService() {
                 profileAvailable = DebugTextProfiles.forVersion(
                     profile.packageName, profile.versionName,
                 ) != null,
-                recognizedFeed = feedVisible,
+                recognizedFeed = recognizedFeed,
             )
         ) {
-            floatingCounter?.hide()
+            hideFloatingCounterImmediately()
             return
         }
-        val total = countStore?.countsFor(LocalDate.now().toString(), selectedAppIds)
-            ?.values?.sumOf { it.countedCount } ?: return
-        floatingCounter?.show(total)
+        ensureFloatingCounterTotalScope()
+        activeCounterFeedAppId = profile.appId
+        floatingCounter?.show(floatingCounterTotalCache.total)
     }
 
-    private fun collectDebugFeedAndKey(
+    private fun ensureFloatingCounterTotalScope() {
+        val changed = floatingCounterTotalCache.setScope(
+            LocalDate.now().toString(),
+            selectedAppIds,
+        )
+        if (changed) {
+            floatingCounterTotalLoadToken += 1L
+            floatingCounterTotalLoadInFlight = false
+        }
+        if (!floatingCounterTotalCache.isLoaded && !floatingCounterTotalLoadInFlight) {
+            loadFloatingCounterTotal()
+        }
+    }
+
+    private fun loadFloatingCounterTotal() {
+        val store = countStore ?: return
+        val ticket = floatingCounterTotalCache.beginLoad()
+        val loadToken = ++floatingCounterTotalLoadToken
+        floatingCounterTotalLoadInFlight = true
+        FLOATING_COUNTER_TOTAL_EXECUTOR.execute {
+            val total = runCatching {
+                store.countsFor(ticket.localDate, ticket.appIds)
+                    .values.sumOf { it.countedCount }
+            }.getOrNull()
+            handler.post {
+                if (instance !== this || loadToken != floatingCounterTotalLoadToken) return@post
+                floatingCounterTotalLoadInFlight = false
+                if (total == null || !floatingCounterTotalCache.acceptLoad(ticket, total)) return@post
+                refreshVisibleCounterFromCachedTotal()
+            }
+        }
+    }
+
+    private fun refreshVisibleCounterFromCachedTotal() {
+        if (floatingCounter?.isShowing != true) return
+        val appId = activeCounterFeedAppId ?: return
+        if (appId !in selectedAppIds || !estimatedCountingEnabled() || !isOperational(this) ||
+            !trackingPreferences().getBoolean(BUBBLE_ENABLED_KEY, false) ||
+            !Settings.canDrawOverlays(this)
+        ) {
+            hideFloatingCounterImmediately()
+            return
+        }
+        val app = SupportedAppsNative.byId(appId) ?: run {
+            hideFloatingCounterImmediately()
+            return
+        }
+        val root = rootInActiveWindow ?: return
+        if (root.packageName?.toString() != app.packageName) {
+            root.recycle()
+            hideFloatingCounterImmediately()
+            return
+        }
+        val version = installedVersion(app.packageName) ?: run {
+            root.recycle()
+            hideFloatingCounterImmediately()
+            return
+        }
+        val validatedProfile = DetectorProfiles.forVersion(
+            app.packageName,
+            version,
+            verifiedDetectorRegistry,
+        )
+        if (validatedProfile?.appId == appId) {
+            val feedVisible = hasAllVisibleResourceIds(
+                root, app.packageName, validatedProfile.feedMarkerViewIds,
+            )
+            if (feedVisible) updateFloatingCounter(validatedProfile, recognizedFeed = true)
+            else hideFloatingCounterImmediately()
+            return
+        }
+        val estimatedProfile = DebugTextProfiles.forVersion(app.packageName, version)
+        if (estimatedProfile?.appId == appId) {
+            val snapshot = collectDebugFeedSnapshot(root, estimatedProfile)
+            if (snapshot.feedVisible && !snapshot.commentsVisible) {
+                updateDebugFloatingCounter(estimatedProfile, recognizedFeed = true)
+            } else if (snapshot.transientGap && !snapshot.commentsVisible) {
+                deferFloatingCounterHide(estimatedProfile)
+            } else if (!snapshot.transientGap || snapshot.commentsVisible) {
+                hideFloatingCounterImmediately()
+            }
+            return
+        }
+        root.recycle()
+        hideFloatingCounterImmediately()
+    }
+
+    private fun recordFloatingCounterCountedEvent() {
+        ensureFloatingCounterTotalScope()
+        val total = floatingCounterTotalCache.recordCountedEvent()
+        if (!floatingCounterTotalCache.isLoaded) {
+            // Invalidate any query started before this persisted count, then read the new total.
+            floatingCounterTotalLoadToken += 1L
+            floatingCounterTotalLoadInFlight = false
+            loadFloatingCounterTotal()
+        } else if (floatingCounter?.isShowing == true && activeCounterFeedAppId != null) {
+            floatingCounter?.show(total)
+        }
+    }
+
+    private fun deferFloatingCounterHide(profile: DebugTextProfile) {
+        if (!debugFloatingCounterEligible(profile) || floatingCounter?.isShowing != true) {
+            hideFloatingCounterImmediately()
+            return
+        }
+        val deadline = floatingCounterVisibilityGrace.onTransientGap(
+            nowMillis = SystemClock.elapsedRealtime(),
+            counterVisible = true,
+        ) ?: return
+        if (floatingCounterGraceRunnable != null) return
+
+        floatingCounterGraceAppId = profile.appId
+        val check = Runnable {
+            floatingCounterGraceRunnable = null
+            val appId = floatingCounterGraceAppId
+            floatingCounterGraceAppId = null
+            if (appId != profile.appId ||
+                !floatingCounterVisibilityGrace.shouldHideAt(SystemClock.elapsedRealtime())
+            ) return@Runnable
+
+            val currentProfile = DebugTextProfiles.forVersion(
+                profile.packageName,
+                installedVersion(profile.packageName).orEmpty(),
+            )
+            if (currentProfile == null || !debugFloatingCounterEligible(currentProfile)) {
+                hideFloatingCounterImmediately()
+                return@Runnable
+            }
+            val root = rootInActiveWindow
+            if (root == null || root.packageName?.toString() != profile.packageName) {
+                root?.recycle()
+                hideFloatingCounterImmediately()
+                return@Runnable
+            }
+            val snapshot = collectDebugFeedSnapshot(root, currentProfile) {
+                floatingCounterVisibilityGrace.onRecognizedFeed()
+                cancelFloatingCounterHideCheck()
+                recognizedFeedAppIds.add(currentProfile.appId)
+                startObservedFeedTime(
+                    debugFeedTimeTarget(currentProfile),
+                )
+                updateDebugFloatingCounter(currentProfile, recognizedFeed = true)
+            }
+            if (!snapshot.feedVisible || snapshot.commentsVisible) {
+                hideFloatingCounterImmediately()
+            }
+        }
+        floatingCounterGraceRunnable = check
+        handler.postDelayed(
+            check,
+            (deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0L),
+        )
+    }
+
+    private fun debugFloatingCounterEligible(profile: DebugTextProfile): Boolean {
+        val preferences = trackingPreferences()
+        return FloatingCounterPolicy.canShow(
+            enabled = preferences.getBoolean(BUBBLE_ENABLED_KEY, false),
+            overlayGranted = Settings.canDrawOverlays(this),
+            trackingConsent = estimatedCountingEnabled(),
+            serviceOperational = isOperational(this),
+            selected = profile.appId in selectedAppIds,
+            profileAvailable = DebugTextProfiles.forVersion(
+                profile.packageName, profile.versionName,
+            ) != null,
+            recognizedFeed = true,
+        )
+    }
+
+    private fun cancelFloatingCounterHideCheck() {
+        floatingCounterGraceRunnable?.let(handler::removeCallbacks)
+        floatingCounterGraceRunnable = null
+        floatingCounterGraceAppId = null
+        floatingCounterVisibilityGrace.onRecognizedFeed()
+    }
+
+    private fun hideFloatingCounterImmediately() {
+        cancelFloatingCounterHideCheck()
+        activeCounterFeedAppId = null
+        floatingCounterVisibilityGrace.onDefiniteFeedExit()
+        floatingCounter?.hide()
+    }
+
+    private fun collectDebugFeedSnapshot(
         root: AccessibilityNodeInfo,
         profile: DebugTextProfile,
-    ): Pair<Boolean, String?> {
-        val viewIds = mutableSetOf<String>()
-        val keys = mutableListOf<String>()
-        var visibleItems = 0
-        var sponsored = false
-        val queue = ArrayDeque<AccessibilityNodeInfo>()
-        queue.add(root)
-        var visited = 0
-        while (queue.isNotEmpty() && visited < MAX_NODES_TO_INSPECT) {
-            val node = queue.removeFirst()
-            val id = StructuralProbeFormatter.resourceNameFor(
-                node.viewIdResourceName, profile.packageName,
-            )
-            if (id != null) viewIds.add(id)
-            if (id == profile.itemNodeId && node.isVisibleToUser) {
-                visibleItems++
-                val (labels, isSponsored) = collectDebugLabels(node)
-                sponsored = sponsored || isSponsored
-                if (!isSponsored) debugHasher?.digest(labels)?.let(keys::add)
+        includeItem: Boolean = false,
+        onFeedRecognized: () -> Unit = {},
+    ): DebugFeedSnapshot {
+        val visibleMarkers = mutableSetOf<String>()
+        var itemNode: AccessibilityNodeInfo? = null
+        val feedVisible: Boolean
+        var commentsVisible = false
+        try {
+            if (root.packageName?.toString() != profile.packageName) {
+                return DebugFeedSnapshot(false, false, transientGap = false)
             }
-            for (index in 0 until node.childCount) {
-                node.getChild(index)?.let(queue::addLast)
+            profile.feedMarkerIds.forEach { markerId ->
+                if (hasVisibleNodeWithId(root, profile.packageName, markerId)) {
+                    visibleMarkers.add(markerId)
+                }
             }
+            feedVisible = profile.isRecognizedFeed(visibleMarkers)
+            if (feedVisible) {
+                val commentsMarkerIds = setOf("comments_sheet", "comment_tray")
+                commentsVisible = commentsMarkerIds.any { markerId ->
+                    hasVisibleNodeWithId(root, profile.packageName, markerId)
+                }
+            }
+            if (feedVisible && !commentsVisible) {
+                // Show immediately after the complete visible Reels signature and
+                // comments state match, before the more expensive item-label scan.
+                onFeedRecognized()
+                if (includeItem) {
+                    itemNode = findUniqueVisibleNode(root, profile.packageName, profile.itemNodeId)
+                }
+            }
+        } finally {
+            root.recycle()
+        }
+        val transientGap = !feedVisible && !commentsVisible &&
+            visibleMarkers.isNotEmpty()
+        return DebugFeedSnapshot(feedVisible, commentsVisible, transientGap, itemNode)
+    }
+
+    private fun hasVisibleNodeWithId(
+        root: AccessibilityNodeInfo,
+        packageName: String,
+        resourceName: String,
+    ): Boolean {
+        val nodes = queryNodesByViewId(root, packageName, resourceName)
+        var found = false
+        nodes.forEach { node ->
+            if (node.isVisibleToUser) found = true
             node.recycle()
-            visited++
         }
-        val complete = queue.isEmpty()
-        while (queue.isNotEmpty()) queue.removeFirst().recycle()
-        val feedVisible = complete && profile.isRecognizedFeed(viewIds)
-        val key = keys.singleOrNull().takeIf {
-            feedVisible && visibleItems == 1 && !sponsored
+        return found
+    }
+
+    private fun hasAllVisibleResourceIds(
+        root: AccessibilityNodeInfo,
+        packageName: String,
+        resourceNames: Set<String>,
+    ): Boolean {
+        if (resourceNames.isEmpty()) {
+            root.recycle()
+            return false
         }
-        return feedVisible to key
+        var foundAll = false
+        try {
+            foundAll = resourceNames.all { resourceName ->
+                hasVisibleNodeWithId(root, packageName, resourceName)
+            }
+        } finally {
+            root.recycle()
+        }
+        return foundAll
+    }
+
+    private fun findUniqueVisibleNode(
+        root: AccessibilityNodeInfo,
+        packageName: String,
+        resourceName: String,
+    ): AccessibilityNodeInfo? {
+        var visibleNode: AccessibilityNodeInfo? = null
+        var visibleCount = 0
+        queryNodesByViewId(root, packageName, resourceName).forEach { node ->
+            if (!node.isVisibleToUser) {
+                node.recycle()
+            } else if (visibleCount++ == 0) {
+                visibleNode = node
+            } else {
+                node.recycle()
+            }
+        }
+        if (visibleCount == 1) return visibleNode
+        visibleNode?.recycle()
+        return null
+    }
+
+    private fun queryNodesByViewId(
+        root: AccessibilityNodeInfo,
+        packageName: String,
+        resourceName: String,
+    ): List<AccessibilityNodeInfo> = try {
+        root.findAccessibilityNodeInfosByViewId("$packageName:id/$resourceName").orEmpty()
+    } catch (_: RuntimeException) {
+        emptyList()
     }
 
     private fun collectDebugLabels(itemRoot: AccessibilityNodeInfo): Pair<List<String>, Boolean> {
@@ -1183,23 +1788,31 @@ class SelectedAppAccessibilityService : AccessibilityService() {
             inspect(itemRoot.contentDescription)
         }
         val queue = ArrayDeque<AccessibilityNodeInfo>()
-        for (index in 0 until itemRoot.childCount) {
-            itemRoot.getChild(index)?.let(queue::addLast)
-        }
-        var visited = 0
-        while (queue.isNotEmpty() && visited < 80 && !sponsored) {
-            val node = queue.removeFirst()
-            if (node.isVisibleToUser) {
-                inspect(node.text)
-                inspect(node.contentDescription)
+        try {
+            for (index in 0 until itemRoot.childCount) {
+                itemRoot.getChild(index)?.let(queue::addLast)
             }
-            for (index in 0 until node.childCount) {
-                node.getChild(index)?.let(queue::addLast)
+            var visited = 0
+            while (queue.isNotEmpty() && visited < 80 && !sponsored) {
+                val node = queue.removeFirst()
+                try {
+                    if (node.isVisibleToUser) {
+                        inspect(node.text)
+                        inspect(node.contentDescription)
+                    }
+                    for (index in 0 until node.childCount) {
+                        node.getChild(index)?.let(queue::addLast)
+                    }
+                    visited++
+                } finally {
+                    node.recycle()
+                }
             }
-            node.recycle()
-            visited++
+        } finally {
+            while (queue.isNotEmpty()) {
+                runCatching { queue.removeFirst().recycle() }
+            }
         }
-        while (queue.isNotEmpty()) queue.removeFirst().recycle()
         return labels to sponsored
     }
 
@@ -1253,7 +1866,7 @@ class SelectedAppAccessibilityService : AccessibilityService() {
                 node.viewIdResourceName,
                 profile.packageName,
             )
-            resourceName?.let(viewIds::add)
+            if (node.isVisibleToUser) resourceName?.let(viewIds::add)
             if (
                 canReadRootIdentity &&
                 resourceName == identityNodeViewId &&
@@ -1505,7 +2118,7 @@ class SelectedAppAccessibilityService : AccessibilityService() {
         val selectionChanged = selectedAppsInitialized && updatedAppIds != selectedAppIds
         if (selectionChanged || previousConsent != consentAcknowledged) {
             stopObservedFeedTime()
-            floatingCounter?.hide()
+            hideFloatingCounterImmediately()
             clearDebugState()
         }
         selectedAppIds = updatedAppIds
@@ -1561,6 +2174,7 @@ class SelectedAppAccessibilityService : AccessibilityService() {
             currentInfo.notificationTimeout = SERVICE_NOTIFICATION_TIMEOUT_MILLIS
             setServiceInfo(currentInfo)
         }
+        ensureFloatingCounterTotalScope()
     }
 
     private fun installedVersion(packageName: String): String? = try {
@@ -1612,16 +2226,22 @@ class SelectedAppAccessibilityService : AccessibilityService() {
         const val BUBBLE_ENABLED_KEY = "bubble_enabled"
         const val SERVICE_INTERRUPTED_LOCAL_DATE_KEY = "service_interrupted_local_date"
         const val LAST_VALIDATED_FEED_EXIT_AT_MILLIS_KEY = "last_validated_feed_exit_at_millis"
+        private const val FLOATING_COUNTER_SCAN_GRACE_MILLIS = 1_500L
         private const val ITEM_IDENTITY_SALT_KEY = "item_identity_salt"
         private const val MAX_OPAQUE_ID_LENGTH = 512
         private const val CONTENT_CHANGE_THROTTLE_MILLIS = 250L
         private const val SCREEN_ON_RECHECK_DELAY_MILLIS = 500L
         private const val SERVICE_NOTIFICATION_TIMEOUT_MILLIS = 200L
         private const val MAX_NODES_TO_INSPECT = 350
+        private const val MAX_DEBUG_PERSISTENCE_RETRIES = 2
         private const val NO_PAGER_INDEX = -1
         private const val REGISTRY_REFRESH_INTERVAL_MILLIS = 6 * 60 * 60 * 1_000L
         private const val DAY_VERIFICATION_CHECK_INTERVAL_MILLIS = 5 * 60 * 1_000L
         private val PROCESS_INSTANCE_ID = UUID.randomUUID().toString()
+        private val FLOATING_COUNTER_TOTAL_EXECUTOR = Executors.newSingleThreadExecutor()
+        private val DEBUG_ITEM_SCAN_EXECUTOR = Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "rooko-visible-item-scan").apply { isDaemon = true }
+        }
 
         @Volatile
         private var instance: SelectedAppAccessibilityService? = null
@@ -1648,7 +2268,7 @@ class SelectedAppAccessibilityService : AccessibilityService() {
         }
 
         fun hideFloatingCounter() {
-            instance?.floatingCounter?.hide()
+            instance?.hideFloatingCounterImmediately()
         }
 
         fun isEnabled(context: Context): Boolean {

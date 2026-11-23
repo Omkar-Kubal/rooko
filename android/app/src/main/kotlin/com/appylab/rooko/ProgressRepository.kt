@@ -140,8 +140,7 @@ internal class ProgressRepository(
                     ),
                 )
             } else {
-                val timezoneStillConsistent = day.timeZoneId == timeZoneId &&
-                    day.offsetSeconds == offsetSeconds
+                val timezoneStillConsistent = day.timeZoneId == timeZoneId
                 dao.putDay(
                     day.copy(
                         timeZoneId = if (timezoneStillConsistent) day.timeZoneId else null,
@@ -217,7 +216,7 @@ internal class ProgressRepository(
             )
             val hasTimezoneEvidence = base.timeZoneId != null && base.offsetSeconds != null
             val timezoneStillConsistent = !hasTimezoneEvidence ||
-                (base.timeZoneId == timeZoneId && base.offsetSeconds == offsetSeconds)
+                base.timeZoneId == timeZoneId
             val updatedBase = if (timezoneStillConsistent) {
                 base
             } else {
@@ -531,8 +530,7 @@ internal class ProgressRepository(
                 "Selected apps changed during the day"
             candidate.profileFingerprint != environment.profileFingerprint ->
                 "A selected app version was not validated throughout the day"
-            candidate.timeZoneId != environment.timeZoneId ||
-                candidate.offsetSeconds != environment.offsetSeconds ->
+            candidate.timeZoneId != environment.timeZoneId ->
                 "Time zone evidence changed during the day"
             environment.nowMillis - candidate.lastCheckpointMillis >
                 DailyVerificationPolicy.MAX_CHECKPOINT_GAP_MILLIS ->

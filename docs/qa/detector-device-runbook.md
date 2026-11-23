@@ -17,15 +17,17 @@ This is a separate debug-only experiment, not covered by ordinary Accessibility 
 Use a test device running API 33+ and record its model/API plus exact installed target-app versions. The implementation only inspects the Instagram `clips_video_container` and YouTube `reel_player_page_container`; an unobserved node or app version is outside this pilot. Start with empty probe files, then create both ten-minute markers only after the separate consent:
 
 ```powershell
-adb shell run-as com.appylab.syncscroll sh -c 'rm -f files/detector_probe.tsv files/detector_probe_status.tsv; touch files/detector_probe_enabled files/detector_probe_identity_relations_enabled'
+adb shell run-as com.appylab.syncscroll sh -c 'rm -f files/detector_probe.tsv files/detector_estimator_probe.tsv files/detector_probe_status.tsv; touch files/detector_probe_enabled files/detector_probe_identity_relations_enabled'
 ```
+
+The standard structural marker also writes a separately bounded, content-free `detector_estimator_probe.tsv` for the Instagram/YouTube fallback. It contains only the allowlisted app/version and static pipeline outcomes (feed recognized, item node present, hash available, root revalidated, and estimator result); it does not contain labels, item hashes, counts, or timestamps. Review it only to locate which pipeline stage drops a manually confirmed transition.
 
 For each selected app/version, enter its short-form feed, observe the same item across multiple accessibility events, then move once to a different item and observe it. Record only coarse action timing outside the app; do not record captions, names, URLs, screenshots, media, or raw IDs. Review only the structural row and relation label (`first`, `same`, `changed`, `no_value`, `invalid_value`, or `api_unavailable`). A `same` or `changed` label is evidence about a node ID at one structural occurrence, not proof of a distinct feed item. Check that one item yields repeatable continuity and a different item changes the ID across repeated attempts. Stop if the IDs are missing, unstable for the same item, or fail to distinguish items.
 
 Stop by removing both markers and deleting the bounded debug output/status files after saving only approved labels:
 
 ```powershell
-adb shell run-as com.appylab.syncscroll sh -c 'rm -f files/detector_probe_enabled files/detector_probe_identity_relations_enabled files/detector_probe.tsv files/detector_probe_status.tsv'
+adb shell run-as com.appylab.syncscroll sh -c 'rm -f files/detector_probe_enabled files/detector_probe_identity_relations_enabled files/detector_probe.tsv files/detector_estimator_probe.tsv files/detector_probe_status.tsv'
 ```
 
 The identity tracker uses a random per-process HMAC key and holds digests in memory for at most five minutes; raw IDs and digests are never written to the probe file. The identity marker expires after ten minutes. On the RMX2156/API 31, do not create this marker or attempt the API call. The API 36 `sync-scroll-preview` pilot ran on 2026-11-07: Instagram `454.0.0.54.77` returned `no_value` for 26 allowed candidate observations; YouTube `21.32.4` returned `no_value` for its one observed candidate, with no new candidate event after a second swipe. No continuity evidence was available, so both versions remain unsupported and must not proceed to the full corpus until another identity signal is found.

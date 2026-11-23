@@ -26,7 +26,8 @@ class ProgressScreen extends StatefulWidget {
   State<ProgressScreen> createState() => _ProgressScreenState();
 }
 
-class _ProgressScreenState extends State<ProgressScreen> {
+class _ProgressScreenState extends State<ProgressScreen>
+    with WidgetsBindingObserver {
   late DateTime _selectedDate;
   ProgressRange? _range;
   bool _weekView = false;
@@ -40,27 +41,46 @@ class _ProgressScreenState extends State<ProgressScreen> {
     if (oldWidget.trackingPlatform != widget.trackingPlatform) _loadRange();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadRange(preserveCurrent: true);
+    }
+  }
+
   DateTime get _start =>
       _weekView ? ProgressCalendar.startOfWeek(_selectedDate) : _selectedDate;
   DateTime get _end =>
       _weekView ? ProgressCalendar.addDays(_start, 6) : _selectedDate;
+  DateTime get _queryStart =>
+      _weekView ? ProgressCalendar.addDays(_start, -7) : _start;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final now = DateTime.now();
     _selectedDate = DateTime(now.year, now.month, now.day);
     _loadRange();
   }
 
-  Future<void> _loadRange() async {
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  Future<void> _loadRange({bool preserveCurrent = false}) async {
     final requestId = ++_rangeRequestId;
     setState(() {
-      _loading = true;
+      _loading = !preserveCurrent || _range == null;
       _loadError = null;
     });
     try {
-      final result = await widget.trackingPlatform.queryProgress(_start, _end);
+      final result = await widget.trackingPlatform.queryProgress(
+        _queryStart,
+        _end,
+      );
       if (!mounted || requestId != _rangeRequestId) return;
       setState(() {
         _range = result;
@@ -69,7 +89,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
     } catch (_) {
       if (!mounted || requestId != _rangeRequestId) return;
       setState(() {
-        _loadError = 'Progress is unavailable right now.';
+        _loadError = _range == null
+            ? 'Progress is unavailable right now.'
+            : null;
         _loading = false;
       });
     }
@@ -157,15 +179,26 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 child: const Text('Retry'),
               ),
             )
-          else if (range != null && !_hasCounts(range))
+          else if (range != null && !_hasRecords(range, _start, _end))
             _EmptyProgressState(weekView: _weekView)
           else if (range != null) ...[
             if (_weekView) ...[
-              _WeekChart(weekStart: _start, range: range),
-              if (_mostRecentPersonalBest(range) case final personalBest?) ...[
+              _WeekChart(
+                weekStart: _start,
+                range: range,
+                onSelectDay: _openDay,
+              ),
+              if (_mostRecentPersonalBest(range, start: _start, end: _end)
+                  case final personalBest?) ...[
                 const SizedBox(height: AppSpacing.x6),
                 _ProgressPersonalBest(day: personalBest),
               ],
+              const SizedBox(height: AppSpacing.x8),
+              _WeekInsights(
+                weekStart: _start,
+                range: range,
+                onViewDay: (day) => _openDay(day.localDate),
+              ),
             ] else if (selectedDay != null) ...[
               _DayDetail(
                 day: selectedDay,
@@ -182,6 +215,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
+  void _openDay(DateTime date) {
+    setState(() {
+      _weekView = false;
+      _selectedDate = DateTime(date.year, date.month, date.day);
+    });
+    _loadRange();
+  }
+
   String _periodLabel(BuildContext context) {
     final localizations = MaterialLocalizations.of(context);
     if (!_weekView) return localizations.formatMediumDate(_selectedDate);
@@ -189,17 +230,228 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 }
 
-bool _hasCounts(ProgressRange range) => range.days.isNotEmpty;
+bool _hasRecords(ProgressRange range, DateTime start, DateTime end) =>
+    range.days.any(
+      (day) => !day.localDate.isBefore(start) && !day.localDate.isAfter(end),
+    );
 
-ProgressDay? _mostRecentPersonalBest(ProgressRange range) {
+ProgressDay? _mostRecentPersonalBest(
+  ProgressRange range, {
+  required DateTime start,
+  required DateTime end,
+}) {
   ProgressDay? newest;
   for (final day in range.days) {
+    if (day.localDate.isBefore(start) || day.localDate.isAfter(end)) continue;
     if (!day.isPersonalBest) continue;
     if (newest == null || day.localDate.isAfter(newest.localDate)) {
       newest = day;
     }
   }
   return newest;
+}
+
+List<ProgressDay> _daysInWeek(ProgressRange range, DateTime weekStart) =>
+    List.generate(
+      7,
+      (index) => range.day(ProgressCalendar.addDays(weekStart, index)),
+    ).whereType<ProgressDay>().toList(growable: false);
+
+int? _verifiedWeekTotal(ProgressRange range, DateTime weekStart) {
+  final days = List.generate(
+    7,
+    (index) => range.day(ProgressCalendar.addDays(weekStart, index)),
+  );
+  if (days.any(
+    (day) => day == null || day.coverage != ProgressCoverage.verified,
+  )) {
+    return null;
+  }
+  return days.fold<int>(0, (sum, day) => sum + day!.countedCount);
+}
+
+int? _completeWeekObservedDuration(ProgressRange range, DateTime weekStart) {
+  final days = List.generate(
+    7,
+    (index) => range.day(ProgressCalendar.addDays(weekStart, index)),
+  );
+  if (days.any((day) => day?.observedFeedDurationMillis == null)) return null;
+  return days.fold<int>(
+    0,
+    (sum, day) => sum + day!.observedFeedDurationMillis!,
+  );
+}
+
+class _WeekInsights extends StatelessWidget {
+  const _WeekInsights({
+    required this.weekStart,
+    required this.range,
+    required this.onViewDay,
+  });
+
+  final DateTime weekStart;
+  final ProgressRange range;
+  final ValueChanged<ProgressDay> onViewDay;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final localizations = MaterialLocalizations.of(context);
+    final recordedDays = _daysInWeek(range, weekStart);
+    final countedDays = recordedDays
+        .where((day) => day.countedCount > 0)
+        .toList(growable: false);
+    final highestCount = countedDays.fold<int>(
+      0,
+      (highest, day) => math.max(highest, day.countedCount),
+    );
+    final highestDays = countedDays
+        .where((day) => day.countedCount == highestCount)
+        .toList(growable: false);
+    final previousWeekStart = ProgressCalendar.addDays(weekStart, -7);
+    final thisWeekTotal = _verifiedWeekTotal(range, weekStart);
+    final previousWeekTotal = _verifiedWeekTotal(range, previousWeekStart);
+    final comparison = thisWeekTotal == null || previousWeekTotal == null
+        ? null
+        : thisWeekTotal - previousWeekTotal;
+    final observedDuration = _completeWeekObservedDuration(range, weekStart);
+    final recordCoverage = recordedDays.length == 1
+        ? '1 day has a saved count record.'
+        : '${recordedDays.length} of 7 days have saved count records.';
+
+    return Column(
+      key: const ValueKey('progress-week-insights'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (highestDays.isNotEmpty) ...[
+          Text(
+            'WEEK INSIGHT',
+            style: AppTypography.cardTitle.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.x2),
+          Text(
+            highestDays.length == 1
+                ? '${_weekdayName(localizations, highestDays.single.localDate)} · '
+                      '$highestCount recorded counts'
+                : 'Highest recorded count: $highestCount on '
+                      '${highestDays.length} days',
+            style: AppTypography.sectionTitle.copyWith(
+              color: colors.onSurface,
+              fontSize: AppTypeScale.large,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.x3),
+          for (final day in highestDays)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.x2),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  key: ValueKey(
+                    'progress-week-view-day-${_dateKey(day.localDate)}',
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.onSurface,
+                    foregroundColor: colors.surface,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.x3,
+                    ),
+                    shape: const StadiumBorder(),
+                  ),
+                  onPressed: () => onViewDay(day),
+                  child: Text(
+                    highestDays.length == 1
+                        ? 'View day'
+                        : 'View ${_weekdayName(localizations, day.localDate)}',
+                  ),
+                ),
+              ),
+            ),
+        ],
+        Text(
+          recordCoverage,
+          style: AppTypography.body.copyWith(color: colors.onSurface),
+        ),
+        Text(
+          'Missing records are not zero.',
+          style: AppTypography.body.copyWith(color: colors.onSurfaceVariant),
+        ),
+        const SizedBox(height: AppSpacing.x8),
+        Text(
+          'LOOKING BACK',
+          style: AppTypography.pageTitle.copyWith(color: colors.onSurface),
+        ),
+        const SizedBox(height: AppSpacing.x4),
+        _WeekInsightMetric(
+          title: 'WEEK-OVER-WEEK',
+          value: comparison == null ? '—' : _weekComparisonValue(comparison),
+          description: comparison == null
+              ? 'A comparison needs complete verified records for both weeks.'
+              : 'Compared with the previous fully verified week.',
+        ),
+        const SizedBox(height: AppSpacing.x6),
+        _WeekInsightMetric(
+          title: 'OBSERVED FEED TIME',
+          value: observedDuration == null
+              ? '—'
+              : _observedDurationValue(observedDuration),
+          description: observedDuration == null
+              ? 'Weekly observed time appears when all seven days are available.'
+              : 'Approximate foreground-feed time observed this week.',
+        ),
+      ],
+    );
+  }
+}
+
+String _weekComparisonValue(int difference) {
+  if (difference == 0) return 'Same total';
+  final amount = difference.abs();
+  return difference < 0 ? '$amount fewer counts' : '$amount more counts';
+}
+
+class _WeekInsightMetric extends StatelessWidget {
+  const _WeekInsightMetric({
+    required this.title,
+    required this.value,
+    required this.description,
+  });
+
+  final String title;
+  final String value;
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: AppTypography.cardTitle.copyWith(
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.x1),
+        Text(
+          value,
+          style: AppTypography.sectionTitle.copyWith(
+            color: colors.onSurface,
+            fontSize: AppTypeScale.large,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.x1),
+        Text(
+          description,
+          style: AppTypography.body.copyWith(color: colors.onSurfaceVariant),
+        ),
+      ],
+    );
+  }
 }
 
 class _ProgressPersonalBest extends StatelessWidget {
@@ -837,9 +1089,15 @@ class _ChartBaselinePainter extends CustomPainter {
 }
 
 class _WeekChart extends StatelessWidget {
-  const _WeekChart({required this.weekStart, required this.range});
+  const _WeekChart({
+    required this.weekStart,
+    required this.range,
+    required this.onSelectDay,
+  });
+
   final DateTime weekStart;
   final ProgressRange range;
+  final ValueChanged<DateTime> onSelectDay;
 
   @override
   Widget build(BuildContext context) {
@@ -857,17 +1115,28 @@ class _WeekChart extends StatelessWidget {
       0,
       (sum, day) => sum + (day?.countedCount ?? 0),
     );
+    final hasCompleteCoverage = days.every(
+      (day) => day?.coverage == ProgressCoverage.verified,
+    );
+    final totalLabel = total == 0 && !hasCompleteCoverage
+        ? '—'
+        : total.toString();
+    final totalSemantics = total == 0 && !hasCompleteCoverage
+        ? 'Total Count this week is unknown because count coverage is incomplete.'
+        : hasCompleteCoverage
+        ? 'Total Count this week: $total.'
+        : 'At least $total counts are recorded this week; count coverage is incomplete.';
     return Column(
       key: const ValueKey('progress-week-chart'),
       children: [
         Semantics(
-          label: '$total Reels and Shorts this week',
+          label: totalSemantics,
           excludeSemantics: true,
           child: Column(
             children: [
-              Text(total.toString(), style: AppTypography.metric),
+              Text(totalLabel, style: AppTypography.metric),
               Text(
-                'Reels and Shorts this week',
+                'Total Count',
                 textAlign: TextAlign.center,
                 style: AppTypography.body.copyWith(
                   color: colors.onSurfaceVariant,
@@ -888,6 +1157,7 @@ class _WeekChart extends StatelessWidget {
                     date: dates[i],
                     day: days[i],
                     maximum: maximum,
+                    onSelectDay: onSelectDay,
                   ),
                 ),
             ],
@@ -903,78 +1173,108 @@ class _WeekBar extends StatelessWidget {
     required this.date,
     required this.day,
     required this.maximum,
+    required this.onSelectDay,
   });
+
   final DateTime date;
   final ProgressDay? day;
   final int maximum;
+  final ValueChanged<DateTime> onSelectDay;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final count = day?.countedCount ?? 0;
     final hasRecord = day != null;
+    final verified = day?.coverage == ProgressCoverage.verified;
     final hasBar = count > 0;
     final fraction = maximum == 0 ? 0.0 : count / maximum;
     final weekday = MaterialLocalizations.of(context)
         .narrowWeekdays[date.weekday % 7];
     final label = MaterialLocalizations.of(context).formatMediumDate(date);
+    final countDescription = !hasRecord
+        ? 'no count record'
+        : count == 0 && !verified
+        ? 'count unknown because coverage is incomplete'
+        : verified
+        ? '$count counts, verified'
+        : '$count recorded counts, coverage incomplete';
     return Semantics(
-      label: hasRecord
-          ? '$label, $count Reels and Shorts'
-          : '$label, no count record',
-      excludeSemantics: true,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: Column(
-          children: [
-            SizedBox(
-              height: _scaledHeight(context, 22),
-              child: Center(
-                child: hasRecord
-                    ? FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          count.toString(),
-                          key: ValueKey(
-                            'progress-week-count-${_dateKey(date)}',
-                          ),
-                          style: AppTypography.cardTitle,
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ),
-            Expanded(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: hasBar
-                    ? FractionallySizedBox(
-                        heightFactor: fraction,
-                        child: Container(
-                          key: ValueKey('progress-week-bar-${_dateKey(date)}'),
-                          width: double.infinity,
-                          constraints: const BoxConstraints(minHeight: 4),
-                          decoration: BoxDecoration(
-                            color: colors.onSurface.withValues(
-                              alpha: 0.55 + fraction * 0.45,
+      label: '$label, $countDescription. Open day details.',
+      button: true,
+      onTap: () => onSelectDay(date),
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: () => onSelectDay(date),
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Column(
+              children: [
+                SizedBox(
+                  height: _scaledHeight(context, 22),
+                  child: Center(
+                    child: hasRecord && (count > 0 || verified)
+                        ? FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              count.toString(),
+                              key: ValueKey(
+                                'progress-week-count-${_dateKey(date)}',
+                              ),
+                              style: AppTypography.cardTitle,
                             ),
-                            borderRadius: BorderRadius.circular(AppRadii.card),
-                          ),
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
+                          )
+                        : hasRecord
+                        ? Text(
+                            '—',
+                            key: ValueKey(
+                              'progress-week-count-${_dateKey(date)}',
+                            ),
+                            style: AppTypography.cardTitle.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ),
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: hasBar
+                        ? FractionallySizedBox(
+                            heightFactor: fraction,
+                            child: Container(
+                              key: ValueKey(
+                                'progress-week-bar-${_dateKey(date)}',
+                              ),
+                              width: double.infinity,
+                              constraints: const BoxConstraints(minHeight: 4),
+                              decoration: BoxDecoration(
+                                color: colors.onSurface.withValues(
+                                  alpha: 0.55 + fraction * 0.45,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadii.card,
+                                ),
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.x1),
+                Text(
+                  '$weekday ${date.day}',
+                  textAlign: TextAlign.center,
+                  softWrap: true,
+                  style: AppTypography.chartLabel.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.x1),
-            Text(
-              '$weekday ${date.day}',
-              textAlign: TextAlign.center,
-              softWrap: true,
-              style: AppTypography.chartLabel.copyWith(
-                color: colors.onSurfaceVariant,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -1064,6 +1364,9 @@ String _dateKey(DateTime date) =>
     '${date.year.toString().padLeft(4, '0')}-'
     '${date.month.toString().padLeft(2, '0')}-'
     '${date.day.toString().padLeft(2, '0')}';
+
+String _weekdayName(MaterialLocalizations localizations, DateTime date) =>
+    localizations.formatFullDate(date).split(',').first;
 
 String _hourLabel(int hour) =>
     '${hour % 12 == 0 ? 12 : hour % 12}${hour < 12 ? 'am' : 'pm'}';

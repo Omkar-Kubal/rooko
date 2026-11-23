@@ -2,7 +2,6 @@ package com.appylab.rooko
 
 import android.content.Context
 import android.view.View
-import android.view.ViewGroup
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
@@ -24,10 +23,10 @@ class FloatingCounterOverlayAccessibilityTest {
         val overlay = FloatingCounterOverlay(context) {}
         assertTrue(overlay.show(0))
 
-        val bubbleField = FloatingCounterOverlay::class.java.getDeclaredField("bubble")
+        val dismissField = FloatingCounterOverlay::class.java
+            .getDeclaredField("closeButton")
             .apply { isAccessible = true }
-        val bubble = bubbleField.get(overlay) as ViewGroup
-        val dismiss = findView(bubble) { it.contentDescription == "Hide floating counter" }
+        val dismiss = dismissField.get(overlay) as? View
         assertNotNull(dismiss)
         dismiss as TextView
 
@@ -39,16 +38,5 @@ class FloatingCounterOverlayAccessibilityTest {
         assertTrue(dismiss.isFocusable)
 
         overlay.hide()
-    }
-
-    private fun findView(root: ViewGroup, matches: (View) -> Boolean): View? {
-        for (index in 0 until root.childCount) {
-            val child = root.getChildAt(index)
-            if (matches(child)) return child
-            if (child is ViewGroup) {
-                findView(child, matches)?.let { return it }
-            }
-        }
-        return null
     }
 }

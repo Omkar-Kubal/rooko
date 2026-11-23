@@ -36,11 +36,13 @@ internal class ObservedFeedTimeTracker(
         val previous = lastSample
         if (previous != null) {
             val delta = elapsedRealtimeMillis - previous.elapsedRealtimeMillis
-            if (previous.scope == scope && delta in 1..maximumSampleGapMillis) {
-                if (pendingScope != null && pendingScope != previous.scope) {
+            if (sameAggregationScope(previous.scope, scope) &&
+                delta in 1..maximumSampleGapMillis
+            ) {
+                if (pendingScope?.let { !sameAggregationScope(it, previous.scope) } == true) {
                     flush()?.let(batches::add)
                 }
-                pendingScope = previous.scope
+                if (pendingScope == null) pendingScope = previous.scope
                 pendingDurationMillis += delta
             } else {
                 flush()?.let(batches::add)
@@ -52,6 +54,14 @@ internal class ObservedFeedTimeTracker(
         }
         return batches
     }
+
+    // UTC offset is retained as metadata but does not split a local-day duration bucket.
+    private fun sameAggregationScope(
+        first: ObservedFeedTimeScope,
+        second: ObservedFeedTimeScope,
+    ): Boolean = first.appId == second.appId &&
+        first.localDate == second.localDate &&
+        first.timeZoneId == second.timeZoneId
 
     /** Clears continuity and returns only already-bounded elapsed time. */
     fun stop(): ObservedFeedDurationBatch? {
@@ -74,6 +84,7 @@ internal class ObservedFeedTimeTracker(
     internal companion object {
         const val MAX_CREDITED_SAMPLE_GAP_MILLIS = 5_000L
         const val HEARTBEAT_INTERVAL_MILLIS = 4_000L
-        const val PERSIST_BATCH_MILLIS = 30_000L
+        // Bound the amount of accumulated foreground time that an abrupt process death can lose.
+        const val PERSIST_BATCH_MILLIS = 10_000L
     }
 }

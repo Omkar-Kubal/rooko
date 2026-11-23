@@ -32,10 +32,20 @@ internal object DebugTextProfiles {
         ),
     )
 
-    fun forVersion(packageName: String, versionName: String): DebugTextProfile? =
-        profiles.firstOrNull {
+    fun forVersion(packageName: String, versionName: String): DebugTextProfile? {
+        val profile = profiles.firstOrNull {
             versionName.isNotBlank() && it.packageName == packageName
-        }?.copy(versionName = versionName)
+        } ?: return null
+        val majorVersion = versionName.substringBefore('.').toIntOrNull()
+        val feedMarkers = if (profile.appId == "instagram" && majorVersion != null && majorVersion >= 456) {
+            // Instagram 456+ exposes the full-screen viewer root. Requiring it prevents
+            // an embedded/retained clips subtree on Home from qualifying as the Reels feed.
+            setOf("root_clips_layout", "clips_viewer_view_pager", "clips_video_container")
+        } else {
+            profile.feedMarkerIds
+        }
+        return profile.copy(versionName = versionName, feedMarkerIds = feedMarkers)
+    }
 }
 
 /** Raw labels are used only in the call to [digest] and never enter count state or storage. */
@@ -57,16 +67,16 @@ internal class DebugTextKeyHasher(secret: String = UUID.randomUUID().toString())
 }
 
 internal enum class DebugEstimateOutcome {
-    OutsideFeed, MissingKey, Candidate, Waiting, Stationary, Duplicate, Counted, BaselineSeeded,
+    OutsideFeed, MissingKey, Candidate, Waiting, Stationary, Duplicate, Counted,
+    PersistenceUnavailable, BaselineSeeded,
 }
 
-/** Intentionally preserves the earlier 150 ms settle / 500 ms spacing test behavior. */
+/** Keeps item deduplication and a short settle window without rate limiting valid transitions. */
 internal class DebugEventEstimateCounter(private val store: CountStore) {
     private data class State(
         var currentKey: String? = null,
         var pendingKey: String? = null,
         var pendingSince: Long = 0L,
-        var lastAcceptedAt: Long? = null,
         var suppressInitialItem: Boolean = false,
         var outsideSince: Long? = null,
     )
@@ -120,17 +130,15 @@ internal class DebugEventEstimateCounter(private val store: CountStore) {
             state.pendingSince = elapsedRealtimeMillis
             return DebugEstimateOutcome.Candidate
         }
-        if (elapsedRealtimeMillis - state.pendingSince < 150 ||
-            state.lastAcceptedAt?.let { elapsedRealtimeMillis - it < 500 } == true
-        ) return DebugEstimateOutcome.Waiting
-
-        state.pendingKey = null
-        state.currentKey = key
+        if (elapsedRealtimeMillis - state.pendingSince < 150) {
+            return DebugEstimateOutcome.Waiting
+        }
         val committed = store.recordIfNew(
             appId, key, elapsedRealtimeMillis, localDateKey,
             CountConfidence.ESTIMATED, wallClockMillis,
         )
-        if (committed) state.lastAcceptedAt = elapsedRealtimeMillis
+        state.pendingKey = null
+        state.currentKey = key
         return if (committed) DebugEstimateOutcome.Counted else DebugEstimateOutcome.Duplicate
     }
 }

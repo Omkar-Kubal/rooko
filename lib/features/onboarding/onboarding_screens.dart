@@ -735,9 +735,7 @@ class AccessUnavailableScreen extends StatelessWidget {
                 : 'Optional. Turn on Accessibility first.',
             granted: overlayPermissionGranted && floatingCounterOptIn,
             onAllow:
-                accessOn &&
-                    serviceOperational &&
-                    !(overlayPermissionGranted && floatingCounterOptIn)
+                accessOn && !(overlayPermissionGranted && floatingCounterOptIn)
                 ? onRequestOverlay
                 : null,
           ),

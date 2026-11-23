@@ -21,6 +21,7 @@ abstract final class AppColors {
 
   static const Color accentLight = ink;
   static const Color accentDark = Color(0xFF303030);
+  static const Color celebrationPink = Color(0xFFF5A0AD);
 
   // Outlines used for interactive controls meet 3:1 against their surfaces.
   static const Color outlineLight = Color(0xFF8A8A8A);

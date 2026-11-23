@@ -503,6 +503,7 @@ class _AppFlowScreenState extends State<AppFlowScreen>
       final preferences = await SharedPreferences.getInstance();
       if (complete) {
         await preferences.setBool(_completedKey, true);
+        await preferences.setBool('rooko_home_welcome_pending', true);
         await preferences.remove(_draftPageKey);
         await preferences.remove(_questionIndexKey);
         await preferences.remove(_questionAnswersKey);
@@ -608,7 +609,6 @@ class _AppFlowScreenState extends State<AppFlowScreen>
     setState(() => _floatingCounterOptIn = optedIn);
     try {
       await widget.trackingPlatform.setBubbleEnabled(optedIn);
-      await _refreshTrackingSnapshot();
     } catch (_) {
       // The user can still skip onboarding and manage the setting later.
     }
@@ -642,12 +642,6 @@ class _AppFlowScreenState extends State<AppFlowScreen>
     try {
       await widget.trackingPlatform.setBubbleEnabled(true);
       await widget.trackingPlatform.setSelectedApps(_selectedApps);
-      final beforeOpening = await widget.trackingPlatform.getSnapshot(
-        _selectedApps,
-      );
-      if (!mounted) return;
-      setState(() => _trackingSnapshot = beforeOpening);
-      if (beforeOpening.overlayPermissionGranted) return;
       _awaitingOverlayReturn = true;
       final opened = await widget.trackingPlatform.openOverlaySettings();
       if (!opened) {

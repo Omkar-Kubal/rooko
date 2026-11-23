@@ -26,10 +26,10 @@ void main() {
     expect(find.text('Week'), findsOneWidget);
     expect(find.text('Month'), findsNothing);
     expect(find.byKey(const ValueKey('progress-day-summary')), findsOneWidget);
-    expect(find.text('Reels and Shorts counted'), findsOneWidget);
+    expect(find.text('Total Count'), findsOneWidget);
     expect(find.text('Top apps'), findsOneWidget);
     expect(find.text('Instagram'), findsOneWidget);
-    expect(find.text('Time spent'), findsNothing);
+    expect(find.text('Time spent'), findsOneWidget);
     expect(find.textContaining('Pro'), findsNothing);
     expect(find.text('6'), findsWidgets);
     expect(platform.lastStart, _today());
@@ -52,14 +52,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       platform.lastStart,
-      _startOfWeek(_today().subtract(const Duration(days: 1))),
+      _startOfWeek(_today().subtract(const Duration(days: 1)))
+          .subtract(const Duration(days: 7)),
     );
     await tester.tap(find.byTooltip('Previous period'));
     await tester.pumpAndSettle();
     expect(
       platform.lastStart,
       _startOfWeek(_today().subtract(const Duration(days: 1)))
-          .subtract(const Duration(days: 7)),
+          .subtract(const Duration(days: 14)),
     );
   });
 
@@ -125,7 +126,7 @@ void main() {
     expect(find.text('Active hours'), findsNothing);
     expect(find.text('Instagram'), findsOneWidget);
     expect(find.text('YouTube Shorts'), findsOneWidget);
-    expect(find.text('Time spent'), findsNothing);
+    expect(find.text('Time spent'), findsOneWidget);
   });
 
   testWidgets('Day chart keeps its dotted baseline while selecting hours', (
@@ -431,7 +432,7 @@ void main() {
     expect(find.text('Week'), findsOneWidget);
     expect(find.text('Month'), findsNothing);
     expect(find.byKey(const ValueKey('progress-week-chart')), findsOneWidget);
-    expect(find.text('Reels and Shorts this week'), findsOneWidget);
+    expect(find.text('Total Count'), findsOneWidget);
     expect(find.byKey(const ValueKey('progress-week-totals')), findsNothing);
     expect(
       find.byKey(
@@ -446,45 +447,56 @@ void main() {
     expect(find.text('YouTube'), findsNothing);
     expect(find.text('6'), findsWidgets);
     expect(find.text('No totals recorded this week.'), findsNothing);
-    expect(platform.lastStart, _startOfWeek(DateTime.now()));
+    expect(
+      platform.lastStart,
+      _startOfWeek(DateTime.now()).subtract(const Duration(days: 7)),
+    );
   });
 
-  testWidgets('Week distinguishes saved zero from a missing day', (
-    tester,
-  ) async {
-    _usePhoneViewport(tester);
-    final monday = _startOfWeek(DateTime.now());
-    final zeroDate = monday.add(const Duration(days: 1));
-    final missingDate = monday.add(const Duration(days: 2));
-    final platform = FakeProgressPlatform(
-      ProgressRange(
-        checkedAtMillis: 0,
-        days: [_day(monday, count: 7), _day(zeroDate, count: 0)],
-      ),
-    );
+  testWidgets(
+    'Week keeps an unverified saved zero unknown and distinct from a missing day',
+    (tester) async {
+      _usePhoneViewport(tester);
+      final monday = _startOfWeek(DateTime.now());
+      final zeroDate = monday.add(const Duration(days: 1));
+      final missingDate = monday.add(const Duration(days: 2));
+      final platform = FakeProgressPlatform(
+        ProgressRange(
+          checkedAtMillis: 0,
+          days: [_day(monday, count: 7), _day(zeroDate, count: 0)],
+        ),
+      );
 
-    await _pumpProgress(tester, platform);
-    await tester.tap(find.text('Week'));
-    await tester.pumpAndSettle();
+      await _pumpProgress(tester, platform);
+      await tester.tap(find.text('Week'));
+      await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(ValueKey('progress-week-count-${_dateKey(zeroDate)}')),
-      findsOneWidget,
-    );
-    expect(find.text('0'), findsWidgets);
-    expect(
-      find.byKey(ValueKey('progress-week-bar-${_dateKey(zeroDate)}')),
-      findsNothing,
-    );
-    expect(
-      find.byKey(ValueKey('progress-week-count-${_dateKey(missingDate)}')),
-      findsNothing,
-    );
-    expect(
-      find.byKey(ValueKey('progress-week-bar-${_dateKey(missingDate)}')),
-      findsNothing,
-    );
-  });
+      expect(
+        find.byKey(ValueKey('progress-week-count-${_dateKey(zeroDate)}')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(ValueKey('progress-week-count-${_dateKey(zeroDate)}')),
+            )
+            .data,
+        '—',
+      );
+      expect(
+        find.byKey(ValueKey('progress-week-bar-${_dateKey(zeroDate)}')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(ValueKey('progress-week-count-${_dateKey(missingDate)}')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(ValueKey('progress-week-bar-${_dateKey(missingDate)}')),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets('a week of saved zero days is not an empty period', (
     tester,

@@ -99,6 +99,7 @@ class ProgressMigrationTest {
                 RookoDatabase.MIGRATION_2_3,
                 RookoDatabase.MIGRATION_3_4,
                 RookoDatabase.MIGRATION_4_5,
+                RookoDatabase.MIGRATION_5_6,
             )
             .allowMainThreadQueries()
             .build()
@@ -113,7 +114,7 @@ class ProgressMigrationTest {
                 "2026-11-06",
             ).single()
 
-            assertEquals(5, version)
+            assertEquals(6, version)
             assertEquals(ProgressCoverage.UNKNOWN, day.coverage)
             assertEquals(false, day.hasHourlyBreakdown)
             assertTrue(day.countedTimes.isEmpty())
@@ -205,6 +206,7 @@ class ProgressMigrationTest {
                 RookoDatabase.MIGRATION_2_3,
                 RookoDatabase.MIGRATION_3_4,
                 RookoDatabase.MIGRATION_4_5,
+                RookoDatabase.MIGRATION_5_6,
             )
             .allowMainThreadQueries()
             .build()
@@ -216,7 +218,7 @@ class ProgressMigrationTest {
             val versionCursor = migrated.openHelper.writableDatabase.query("PRAGMA user_version")
             versionCursor.use {
                 assertTrue(it.moveToFirst())
-                assertEquals(5, it.getInt(0))
+                assertEquals(6, it.getInt(0))
             }
             LegacyProgressDatabaseMover.prepare(context)
         } finally {

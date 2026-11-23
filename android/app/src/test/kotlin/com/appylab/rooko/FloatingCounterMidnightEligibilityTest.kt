@@ -55,7 +55,7 @@ class FloatingCounterMidnightEligibilityTest {
         val counter = FloatingCounterOverlay(service) {}
         try {
             prepareService(service, counter)
-            assertTrue(counter.showPreview(53))
+            counter.show(53)
 
             // A normal five-minute Progress checkpoint is not a feed-exit event.
             // Robolectric has no active root, as can also happen during a Reel swipe.
@@ -75,7 +75,7 @@ class FloatingCounterMidnightEligibilityTest {
         val counter = FloatingCounterOverlay(service) {}
         try {
             prepareService(service, counter)
-            assertTrue(counter.showPreview(0))
+            counter.show(0)
             assertTrue(isCounterShowing(counter))
 
             invokePrivate(
@@ -104,7 +104,7 @@ class FloatingCounterMidnightEligibilityTest {
         val counter = FloatingCounterOverlay(service) {}
         try {
             prepareService(service, counter)
-            assertTrue(counter.showPreview(0))
+            counter.show(0)
 
             invokePrivate(
                 service,
