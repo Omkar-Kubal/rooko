@@ -6,7 +6,7 @@ import 'package:rooko/core/platform/tracking_platform.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const channel = MethodChannel('com.appylab.rooko/tracking_v1');
+  const channel = MethodChannel('com.heykakaa.rooko/tracking_v1');
   late MethodChannelTrackingPlatform platform;
 
   setUp(() {

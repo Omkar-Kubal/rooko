@@ -6,4 +6,4 @@
     android:canRetrieveWindowContent="true"
     android:description="@string/scroll_accessibility_service_description"
     android:notificationTimeout="200"
-    android:packageNames="com.appylab.rooko" />
+    android:packageNames="com.heykakaa.rooko" />

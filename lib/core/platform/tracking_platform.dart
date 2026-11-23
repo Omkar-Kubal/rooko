@@ -224,7 +224,7 @@ class MethodChannelTrackingPlatform implements TrackingPlatform {
     this.channel = const MethodChannel(channelName),
   });
 
-  static const channelName = 'com.appylab.rooko/tracking_v1';
+  static const channelName = 'com.heykakaa.rooko/tracking_v1';
 
   final MethodChannel channel;
 

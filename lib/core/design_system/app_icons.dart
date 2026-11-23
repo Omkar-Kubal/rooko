@@ -18,7 +18,7 @@ abstract final class AppIconSizes {
 abstract final class AppIcons {
   // Primary destinations and product concepts.
   static const home = HugeIcons.strokeRoundedHome01;
-  static const progress = HugeIcons.strokeRoundedCalendar03;
+  static const progress = HugeIcons.strokeRoundedAnalytics01;
   static const battle = HugeIcons.strokeRoundedSwords;
   static const limits = HugeIcons.strokeRoundedTarget01;
   static const settings = HugeIcons.strokeRoundedSettings01;

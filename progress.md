@@ -1,4 +1,30 @@
 # Rooko project progress
+
+## Progress navigation icon (2026-11-23)
+
+- Replaced the calendar glyph with a neutral analytics glyph to represent the Day/Week charts. Existing icon sizing and the “Progress” accessibility label remain. `git diff --check` passed; no tests were run for this one-line icon mapping change.
+
+## Device build after Progress icon update (2026-11-23)
+
+- `flutter run -d b5637f72 --debug --no-pub` failed at `:app:kspDebugKotlin` while Flutter selected Android Studio JDK 25. The KSP task and `:app:assembleDebug --no-configuration-cache` both succeeded under the installed Temurin JDK 17 with `JAVA_HOME` scoped to the command; no global Flutter or Java configuration was changed.
+- Confirmed the APK ID as `com.heykakaa.rooko`, installed it on OPPO CPH2565 / Android 15 using `adb -s b5637f72 install -r`, completed OPPO's “No risks found” install confirmation, and launched `com.heykakaa.rooko/.MainActivity`. ADB reported the app process and MainActivity foreground. No tests or broader UI checks were run.
+
+## Android package ID change (2026-11-23)
+
+- Updated Android namespace/application ID and Kotlin package from `com.appylab.rooko` to `com.heykakaa.rooko`; updated the Accessibility service package filter and Flutter tracking channel. Kotlin source/test directories now match the namespace.
+- Registered Firebase Android app `1:1072659092681:android:6ca9a2df86c9f6a136e918` in project `toki-0001` and replaced Google Services config with its matching file. Updated active package references in README, PRD, SRS, and context.
+- `flutter build apk --debug --no-pub` succeeded. `aapt dump badging build/app/outputs/flutter-apk/app-debug.apk` confirms application ID `com.heykakaa.rooko`; the merged manifest registers the new package's app components. The new Room schema export is present at `android/app/schemas/com.heykakaa.rooko.RookoDatabase/6.json`. The APK has since been installed and launched on OPPO CPH2565 / Android 15 as recorded above. No test suite was run.
+- This installs as a separate Android app from `com.appylab.rooko` and the former Sync Scroll ID. Their local data and permission grants do not transfer; the new installation requires fresh onboarding and Android permissions.
+
+## Play Store description draft (2026-11-23)
+
+- Expanded the short and full “About this app” listing in `playstore/about-this-app.md` with Today, Day/Week Progress, Rook, optional floating counter, setup, themes, measurement limits, privacy, and support. The short and full fields are 62/80 and 2,893/4,000 characters. The draft is local; it has not been uploaded to Play Console.
+
+## RevenueCat deferral (2026-11-23)
+
+- RevenueCat is deferred because Rooko has no revenue source or purchase model; no code, dependency, API, or UI changes were made. The billing-free product requirements remain authoritative.
+- Release scan of `pubspec.yaml`, `pubspec.lock`, Android Gradle files/manifests, and Flutter/Kotlin app sources found no RevenueCat or billing SDK, purchase flow, subscription, entitlement, paywall, or payment gate. Navigation-source scan found no purchase/paywall route. Empty `rg` results (exit code 1) indicate no matches.
+
 ## Instagram count-flow retest (2026-11-23) — one device run matched
 
 - On OPPO CPH2565 / Android 15 with Instagram `456.1.0.56.78`, the user confirmed another 10 changed Reels on the coalesced-scan build. Today stayed at Instagram 13 / total 22: 0/10. That build predated the lightweight stage-summary diagnostic.

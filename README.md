@@ -33,6 +33,6 @@ flutter build web
 - `lib/core/design_system/` — semantic colors, typography, Material themes, and HugeIcons registry.
 - `lib/features/foundation/` — starter screen used to preview design tokens.
 - `web/global.css` — CSS custom properties mirrored from Dart design tokens.
-- `android/` — native Android host. Package ID: `com.appylab.rooko`.
+- `android/` — native Android host. Package ID: `com.heykakaa.rooko`.
 - `.agents/skills/` — project-specific agent workflows.
 - `analysis/brainpal/` — REA findings for the reference app; preserve this evidence.

@@ -8,7 +8,7 @@ The name and package ID below are user-approved Rooko decisions, not findings ex
 
 ### 1.1 Name and positioning
 
-**App name: Rooko. Android package ID: `com.appylab.rooko`.** Tagline: **“Count less. Win your time back.”** Rooko is a scorecard for short-form viewing and a tool for self-directed improvement. “Win” means learning from one's own verified record; the app must never reward watching more. It is not a medical or mental-health treatment. The folder name `sync-rot` is a historical project codename. The changed Android package ID installs Rooko separately from `com.appylab.syncscroll`; the old app and its private data remain untouched. This change does not migrate old data or permissions into Rooko.
+**App name: Rooko. Android package ID: `com.heykakaa.rooko`.** Tagline: **“Count less. Win your time back.”** Rooko is a scorecard for short-form viewing and a tool for self-directed improvement. “Win” means learning from one's own verified record; the app must never reward watching more. It is not a medical or mental-health treatment. The folder name `sync-rot` is a historical project codename. The new Android package ID installs Rooko separately from both the prior `com.appylab.rooko` build and former `com.appylab.syncscroll`; private app data and permissions do not transfer from either installation.
 
 The Rooko name still needs Play Store, domain, handle, and trademark checks before release. The legal entity name is undecided. Do not use BrainPal, BrainRot, its brain character, illustrations, copy, or visual arrangement.
 

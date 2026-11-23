@@ -4,7 +4,7 @@
 
 ## 1. Scope, terms, and authority
 
-This SRS specifies the **new** Rooko app, with Android package ID `com.appylab.rooko`. The [BrainPal research ledger](../analysis/brainpal/FINDINGS.md) provides comparative evidence, not source code or an implementation contract. The static APK shows Accessibility and Usage Stats routes, local per-app/day aggregates, a floating service, block decisions, and cloud interfaces. Live tests leave exact cross-app count accuracy and block-screen behavior unresolved. The choices here are intentionally original and must be validated on real devices.
+This SRS specifies the **new** Rooko app, with Android package ID `com.heykakaa.rooko`. The [BrainPal research ledger](../analysis/brainpal/FINDINGS.md) provides comparative evidence, not source code or an implementation contract. The static APK shows Accessibility and Usage Stats routes, local per-app/day aggregates, a floating service, block decisions, and cloud interfaces. Live tests leave exact cross-app count accuracy and block-screen behavior unresolved. The choices here are intentionally original and must be validated on real devices.
 
 | Term | Meaning |
 | --- | --- |

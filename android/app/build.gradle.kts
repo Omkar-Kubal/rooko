@@ -27,7 +27,7 @@ val detectorRegistryPublicKey = providers.gradleProperty("rookoDetectorRegistryP
     .get()
 
 android {
-    namespace = "com.appylab.rooko"
+    namespace = "com.heykakaa.rooko"
     buildFeatures {
         buildConfig = true
     }
@@ -40,7 +40,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.appylab.rooko"
+        applicationId = "com.heykakaa.rooko"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 29
