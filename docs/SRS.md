@@ -136,6 +136,8 @@ Daily limits, limit-triggered interruptions, pauses, overrides, and dependent ch
 | FR-046 | Deferred | Missed-interruption fallback | Not active; no missed-interruption records or fallback notification |
 | FR-047 | Deferred | Stronger timed mode | Not active; revisit only after a separate product decision |
 
+The user-directed [PRD section 4.4](PRD.md#44-candidate-focus-tools--feature-exploration) is exploratory UX, not an activation of these historical requirements. Its only candidate usage limit is for the whole selected app; the counter-event cap in FR-040 and any Reels/Shorts time or count allowance are outside that candidate set.
+
 If interruption behavior is proposed again, review current Android background-launch and Play policies before implementation. This section is not permission to launch Activities, show overlays, or send notifications for a cap crossing in the current product.
 
 ### 3.5 Bubble, game feedback, and notifications
@@ -183,6 +185,12 @@ Any M3 feature whose scoring or completion depends on a daily limit, override, o
 | --- | --- | --- | --- |
 | FR-072 | P1 | Android Firebase Analytics and Crashlytics shall initialize automatically for developer metrics, without a Settings control. Emit only the parameter-free `rooko_app_open` custom event and allow Firebase's standard app/session events and crash reports with technical app/device diagnostics; disable automatic Activity screen reporting, Analytics advertising ID collection, and the `AD_ID` permission. Do not attach user IDs, counts, selected apps, observed-time totals, Accessibility state/content, feed labels, item identifiers, or support diagnostics to Firebase events, keys, or logs. Firebase initialization failure shall not block local app use. The published Google Sites policy reflects this behavior; Settings and onboarding Privacy Policy actions open it in an external browser. | Android manifest and source review; merged-manifest permission check; Firebase payload/config review; startup with Firebase unavailable; analyzer and Android build; release policy-copy review |
 
+### 3.9 Creator shelf
+
+| ID | Priority | System requirement | Verification |
+| --- | --- | --- | --- |
+| FR-073 | P1 | Settings shall provide Focus tools → Creator shelf. Users can add, edit, remove, order, and reopen Instagram profile handles. Accept a plain handle, one leading `@`, or an Instagram profile URL on an exact supported host; normalize to lowercase handles containing only letters, digits, periods, or underscores, with a maximum length of 30. Reject invalid, reserved-route, deceptive-host, and duplicate entries. Persist only normalized handles in private local preferences, preserving list order. Opening a handle shall send `https://www.instagram.com/{handle}/` to an Android `ACTION_VIEW` intent explicitly restricted to `com.instagram.android`; a false or failed handoff shall show the URL, a browser action, and a copy action. This shortcut works without tracking consent or Accessibility access, adds no permission or network call from Rooko, and does not filter or control Instagram's feed. A successful handoff does not establish that Instagram displayed the profile. | Normalization and hostile-link tests; duplicate, edit, remove, order, persistence-after-restart tests; Settings route and empty/list UI tests; package-targeted launch on a device with Instagram; missing-app and browser-unavailable fallback; use with Accessibility disabled; theme, TalkBack, and 200% text checks |
+
 ## 4. Data specification
 
 The Kotlin layer owns one Room database. All write paths use transactions and versioned migrations. Suggested schema:
@@ -225,7 +233,7 @@ No media title, URL, text from an Accessibility node, screenshot, contact, messa
 
 ### 5.2 Flutter/native bridge contract
 
-Version 1 bridge operations include `getCapabilities()`, `getTrackingStatus()`, `setSelectedApps(ids)`, `watchToday()`, `queryProgress(range)`, and `setBubbleEnabled(bool)`. Legacy correction methods may remain for migration compatibility but are not called by the Progress UI. `queryProgress` returns real local counter totals plus verified-day metadata for the requested range. Every response carries a typed success/error result, bridge schema version, and UTC timestamp. `watchToday` sends immutable snapshots, including the latest validated feed-exit signal. Calls are idempotent where a command ID is supplied. The native module must continue counting and checkpointing while Flutter UI is not alive. Export and deletion remain planned operations but are unavailable in this UI pass.
+Version 1 bridge operations include `getCapabilities()`, `getTrackingStatus()`, `setSelectedApps(ids)`, `watchToday()`, `queryProgress(range)`, `setBubbleEnabled(bool)`, and `openInstagramProfile(normalizedHandle)`. The profile operation validates a single normalized handle and sends an HTTPS profile `ACTION_VIEW` intent to Instagram's package; its Boolean result reports only whether Android accepted the handoff. Legacy correction methods may remain for migration compatibility but are not called by the Progress UI. `queryProgress` returns real local counter totals plus verified-day metadata for the requested range. Every response carries a typed success/error result, bridge schema version, and UTC timestamp. `watchToday` sends immutable snapshots, including the latest validated feed-exit signal. Calls are idempotent where a command ID is supplied. The native module must continue counting and checkpointing while Flutter UI is not alive. Export and deletion remain planned operations but are unavailable in this UI pass.
 
 ### 5.3 Proposed M3 server contract
 

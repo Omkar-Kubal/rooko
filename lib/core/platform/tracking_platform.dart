@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 
+import '../models/creator_profile.dart';
 import '../models/progress.dart';
 import '../models/supported_app.dart';
 
@@ -191,6 +192,8 @@ abstract interface class TrackingPlatform {
 
   Future<bool> openSupportedApp(String appId);
 
+  Future<bool> openInstagramProfile(String handle);
+
   Future<bool> openSupportedAppSettings(String appId);
 
   Future<bool> openSupportEmail(SupportEmailKind kind);
@@ -267,6 +270,17 @@ class MethodChannelTrackingPlatform implements TrackingPlatform {
     return await channel.invokeMethod<bool>(
           'openSupportedApp',
           <String, Object?>{'appId': appId},
+        ) ??
+        false;
+  }
+
+  @override
+  Future<bool> openInstagramProfile(String handle) async {
+    final normalizedHandle = CreatorProfile.normalizeHandle(handle);
+    if (normalizedHandle == null) return false;
+    return await channel.invokeMethod<bool>(
+          'openInstagramProfile',
+          <String, Object?>{'handle': normalizedHandle},
         ) ??
         false;
   }

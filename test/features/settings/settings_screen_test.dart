@@ -11,6 +11,22 @@ import 'package:rooko/features/settings/settings_screen.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('opens Focus tools and the Creator shelf from Settings', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    await _pumpSettings(tester, FakeSettingsPlatform());
+
+    await tester.tap(find.byKey(const ValueKey('settings-focus-tools')));
+    await tester.pumpAndSettle();
+    expect(find.text('Focus tools'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('focus-tools-creator-shelf')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Creator shelf'), findsOneWidget);
+    expect(find.text('No creators saved yet.'), findsOneWidget);
+  });
+
   testWidgets(
     'shows settings groups and marks unfinished actions unavailable',
     (tester) async {
@@ -466,6 +482,9 @@ class FakeSettingsPlatform implements TrackingPlatform {
 
   @override
   Future<bool> openSupportedApp(String appId) async => true;
+
+  @override
+  Future<bool> openInstagramProfile(String handle) async => true;
 
   @override
   Future<bool> openSupportedAppSettings(String appId) async => true;

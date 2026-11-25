@@ -13,6 +13,7 @@ import '../../core/platform/tracking_consent_dialog.dart';
 import '../../core/platform/tracking_platform.dart';
 import 'help_diagnostics_screen.dart';
 import 'help_feedback_sheets.dart';
+import 'focus_tools_screen.dart';
 import 'local_release_notes.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -347,6 +348,16 @@ class _SettingsScreenState extends State<SettingsScreen>
     await showWhatsNewSheet(context, appVersion: version);
   }
 
+  void _openFocusTools() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FocusToolsScreen(
+          openInstagramProfile: widget.trackingPlatform.openInstagramProfile,
+        ),
+      ),
+    );
+  }
+
   Future<void> _showHelpAndFeedback() async {
     final action = await showHelpFeedbackSheet(context);
     if (!mounted || action == null) return;
@@ -489,6 +500,26 @@ class _SettingsScreenState extends State<SettingsScreen>
                       onPressed: _busy ? null : _openAccessibilitySettings,
                       child: Text(accessActionLabel),
                     ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.x4),
+        _SettingsGroup(
+          title: 'Focus tools',
+          children: [
+            ListTile(
+              key: const ValueKey('settings-focus-tools'),
+              contentPadding: EdgeInsets.zero,
+              onTap: _openFocusTools,
+              leading: const _SettingsGlyph(icon: AppIcons.creatorGroup),
+              title: Text('Focus tools', style: AppTypography.cardTitle),
+              subtitle: Text(
+                'Creator shelf',
+                style: AppTypography.supporting.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+              trailing: const AppIcon(icon: AppIcons.next),
             ),
           ],
         ),

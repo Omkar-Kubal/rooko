@@ -29,6 +29,9 @@ abstract final class AppIcons {
   static const permission = HugeIcons.strokeRoundedAccessibility;
   static const warning = HugeIcons.strokeRoundedAlert01;
   static const success = HugeIcons.strokeRoundedCheckmarkCircle01;
+  static const creatorGroup = HugeIcons.strokeRoundedUserGroup;
+  static const add = HugeIcons.strokeRoundedAdd01;
+  static const more = HugeIcons.strokeRoundedMoreVertical;
   static const privacy = HugeIcons.strokeRoundedShield01;
   static const lock = HugeIcons.strokeRoundedLock;
 

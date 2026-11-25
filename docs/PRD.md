@@ -251,6 +251,45 @@ This table captures relevant REA findings that might otherwise be mistaken for a
 5. **Deferred limits:** retain saved legacy values only for compatibility. They do not affect the UI, Rook states, counting, or interruptions.
 6. **Privacy:** no account is required for local tracking. Do not upload count records, selected-app details, observed-time totals, Accessibility node text, media titles, or feed identifiers. After the updated in-app tracking disclosure, the Instagram/YouTube estimator reads bounded visible labels only transiently, hashes them with a process-local key, and saves no raw labels. Existing users must acknowledge the expanded disclosure before estimation begins. The signed version registry request contains no installed version or selected-app data, though its host may receive the client's IP/network metadata. Firebase Analytics and Crashlytics initialize automatically on Android for developer metrics, including standard app/session events and crash reports with technical app/device details. Automatic Activity screen reporting is disabled; Analytics advertising ID collection and the `AD_ID` permission are disabled; the sole custom event is parameter-free `rooko_app_open`. Do not add user IDs, counts, selected apps, observed time, Accessibility or feed content to Firebase events, keys, or logs. The Google Sites-ready HTML policy now describes this behavior; the obsolete in-app policy sheet is removed and Privacy Policy actions open the public page. If M3 sync is enabled, ask separately and show exactly which aggregates are shared.
 
+### 4.4 Creator shelf and candidate focus tools
+
+**Status (2026-11-25): Creator shelf is approved as the first active focus feature.** The other seven concepts remain exploratory and outside the current implementation scope. Sections 3.1 and 4.1, UX-07/08, and SRS section 3.4 still defer limits and interruptions. The only proposed usage limit here is a **whole-app limit**; there is no Reels/Shorts time allowance, swipe-count cap, or other feed-specific quota. Progress's existing approximate observed-feed-time display remains a record, not a limit. [SocialLite REA](../analysis/sociallite/FINDINGS.md) shows shipped feed-recognition, app-blocking, schedule, and usage-limit code paths; it does not establish their live reliability or make these Rooko requirements.
+
+**Focus tools** is a page under Settings. Creator shelf is its only implemented entry in this scope. It saves normalized Instagram handles locally and opens the corresponding profile link when the user taps a creator. It does not require tracking consent or Accessibility access, and it does not filter Instagram's feed or recommendations. Other proposed tools remain independently gated candidates. Any future implementation must keep saved entries and rules local, preserve permission recovery, and avoid storing feed text or media.
+
+| Focus-tool concept | User-visible concept | Development shape |
+| --- | --- | --- |
+| Creator shelf (active) | Save chosen Instagram creators and open their profiles directly | Local shortcuts; Instagram controls later recommendations |
+| Hashtag shelf | Save topics and open the corresponding Instagram search | Local shortcuts; Instagram controls search results and later scrolling |
+| Purposeful launch | Choose a creator, topic, or long-video destination before opening an app | One launch flow built on the saved shortcuts |
+| YouTube long-video mode | Open videos, channels, playlists, or search while guarding recognized Shorts entry | Long-video shortcuts plus the Shorts entry guard; ordinary YouTube paths must remain available |
+| Reels/Shorts entry guard | Interrupt entry into a recognized short-form feed and let the user leave or continue that visit | Feed-level recognition and a reversible interruption, with no time or count quota |
+| Sleep routine | Pause selected Instagram and/or YouTube apps during chosen days and an overnight window | Scheduled whole-app interruption with a temporary break |
+| Whole-app limit | Set a daily foreground-use limit for Instagram or YouTube as a whole | Per-app usage tracking and an app-wide pause; includes messages, search, and long videos |
+| Focus presets | Save and switch combinations such as Creator Research, Long Videos, and Wind Down | Reuse the shelves, entry guard, sleep routine, and whole-app limit |
+
+**User flows**
+
+1. **Creator shelf (active):** Settings → Focus tools → Creator shelf → add an Instagram handle or profile link → review the saved list → tap a creator to open that profile in Instagram. The empty state offers Add creator. Accept plain handles, `@handles`, or Instagram profile URLs; normalize and store only the handle, preserve list order, and reject invalid or duplicate entries. If Instagram is missing or a link cannot open, show the profile link and browser and copy options. A successful launch means Android accepted the request; it does not prove Instagram displayed the profile. Opening a profile does not filter Instagram's later Reels.
+2. **Hashtag shelf:** Settings → Focus tools → Hashtag shelf → add and review a tag → tap it to open Instagram search for that tag. The empty state offers Add hashtag. If a direct search link fails, show the exact saved tag and open Instagram search for manual entry. Search results and subsequent Reels remain Instagram-controlled.
+3. **Purposeful launch:** From Focus tools or an optional Today shortcut, tap Start with purpose → choose Creator, Hashtag, or Long video → select a saved destination or enter a new search → open the corresponding app. When the user returns, Today shows its existing records. If no destination is saved, offer Add one or Open app normally; this prompt is never required just to use a supported app.
+4. **YouTube long-video mode:** Focus tools → Long videos → choose a saved video/channel/playlist or enter a search → open it in YouTube. If the user later enters a recognized Shorts feed and the entry guard is enabled, show the guard with a route back to the Long videos launcher. If Shorts recognition is unavailable for the installed version, show that status before launch and do not label the session Shorts-free.
+5. **Reels/Shorts entry guard:** Focus tools → Entry guard → enable Instagram Reels, YouTube Shorts, or both. On a recognized feed entry, show a pause surface naming the app and offering Leave to Rooko or Continue this visit. Continue dismisses the guard until the user exits that feed; a later entry can prompt again. If detection or access is lost, show the rule as unavailable in Focus tools. The guard has no daily or session quota.
+6. **Sleep routine:** Focus tools → Sleep routine → choose Instagram, YouTube, or both; weekdays; start and end times → preview the next active interval → save and enable. Opening a selected app during that interval shows its pause surface, scheduled end, Return to Rooko, and a user-controlled temporary break. An overnight interval spans midnight. When the interval ends, the app opens normally; revoked access or unavailable scheduling appears as an inactive status in Focus tools.
+7. **Whole-app limit:** Focus tools → Whole-app limit → select Instagram or YouTube and daily minutes → review that all foreground time in the selected app counts → save and enable. Show remaining app time when known. At the limit, opening that app shows the app-wide pause surface with Return to Rooko, Temporary break, and Edit limit. Reset on the next local day. If usage coverage is missing, show the remaining amount as unavailable rather than claiming the limit was enforced. No Reels/Shorts-only limit is offered.
+8. **Focus presets:** Focus tools → Presets → choose a starting preset or create one → preview its saved destinations and enabled guard, sleep, and whole-app rules → edit and save → activate from Focus tools or a future quick action. Show the active preset and the reason an app is paused. If several rules apply, the pause surface names each active reason; turning off a preset does not erase its saved entries or rule settings.
+
+**Proposed build order (dependencies, not release commitments)**
+
+1. Creator shelf: establish locally saved profile destinations and empty/error states.
+2. Hashtag shelf: add locally saved search destinations and a manual-search fallback.
+3. Purposeful launch: combine those destinations with a YouTube long-video entry path.
+4. Reels/Shorts entry guard: add opt-in feed-entry recognition and one-visit continuation without usage quotas.
+5. YouTube long-video mode: pair the long-video entry path with the Shorts guard and preserve search, channels, and normal playback.
+6. Sleep routine: add one shared whole-app pause surface, schedule state, and temporary-break behavior.
+7. Whole-app limit: reuse that pause surface with separate per-app foreground-use accounting and unknown-coverage states.
+8. Focus presets: compose the working shortcuts and rules after their individual behavior is defined.
+
 ## 5. Feature requirements and acceptance
 
 | ID | Priority | Requirement | Product acceptance |
@@ -272,6 +311,7 @@ This table captures relevant REA findings that might otherwise be mistaken for a
 | PR-15 | P2 | Ship the complete v2.0 feature set without monetization gates | No billing SDK, purchase screen, entitlement check, subscription, ad SDK, or locked feature in release |
 | PR-16 | P2 | Support the six target social app families after validation | Each profile passes the accuracy gate or the scope change is explicitly approved |
 | PR-17 | P0 | Match installed app versions against an internet-hosted detector registry | The signed registry maps exact package/version pairs to shared, validated profiles made from bounded data and built-in detector strategies; unknown or unvalidated versions stay unavailable, and no installed-app details are sent to the registry |
+| PR-18 | P1 | Save Instagram creator profile shortcuts locally | Add, edit, remove, order, and reopen normalized handles after restart; reject invalid and duplicate entries; require no tracking consent or Accessibility access; offer the web profile link and browser/copy fallback if Instagram cannot open it; do not filter Instagram's feed |
 
 ## 6. Free product and trust
 

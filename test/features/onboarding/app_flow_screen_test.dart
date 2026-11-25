@@ -1298,6 +1298,9 @@ class FakeTrackingPlatform implements TrackingPlatform {
   }
 
   @override
+  Future<bool> openInstagramProfile(String handle) async => true;
+
+  @override
   Future<bool> openSupportedAppSettings(String appId) async => true;
 
   @override

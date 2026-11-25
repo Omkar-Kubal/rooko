@@ -149,6 +149,10 @@ class MainActivity : FlutterActivity() {
                 result.success(openSupportedApp(call.argument<String>("appId")))
             }
 
+            "openInstagramProfile" -> {
+                result.success(openInstagramProfile(call.argument<String>("handle")))
+            }
+
             "openSupportedAppSettings" -> {
                 result.success(openSupportedAppSettings(call.argument<String>("appId")))
             }
@@ -280,6 +284,29 @@ class MainActivity : FlutterActivity() {
         }
         return try {
             val intent = packageManager.getLaunchIntentForPackage(targetPackage) ?: return false
+            startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun openInstagramProfile(handle: String?): Boolean {
+        if (handle == null ||
+            !Regex("^[A-Za-z0-9._]{1,30}$").matches(handle) ||
+            handle.startsWith('.') ||
+            handle.endsWith('.') ||
+            handle.lowercase() in setOf(
+                "accounts", "direct", "explore", "p", "reel", "reels", "stories", "tags", "tv",
+            )
+        ) {
+            return false
+        }
+        return try {
+            val profileUri = Uri.parse("https://www.instagram.com/${handle.lowercase()}/")
+            val intent = Intent(Intent.ACTION_VIEW, profileUri)
+                .setPackage("com.instagram.android")
+            if (intent.resolveActivity(packageManager) == null) return false
             startActivity(intent)
             true
         } catch (_: Exception) {

@@ -124,6 +124,24 @@ void main() {
     ]);
   });
 
+  test('opens an Instagram profile through the typed native bridge', () async {
+    MethodCall? received;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          received = call;
+          return true;
+        });
+
+    final opened = await platform.openInstagramProfile('creator.name');
+
+    expect(opened, isTrue);
+    expect(received?.method, 'openInstagramProfile');
+    expect(
+      (received?.arguments as Map<Object?, Object?>)['handle'],
+      'creator.name',
+    );
+  });
+
   test(
     'persists affirmative consent before requesting Android access',
     () async {
