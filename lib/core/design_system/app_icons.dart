@@ -30,6 +30,7 @@ abstract final class AppIcons {
   static const warning = HugeIcons.strokeRoundedAlert01;
   static const success = HugeIcons.strokeRoundedCheckmarkCircle01;
   static const creatorGroup = HugeIcons.strokeRoundedUserGroup;
+  static const hashtag = HugeIcons.strokeRoundedHashtag;
   static const add = HugeIcons.strokeRoundedAdd01;
   static const more = HugeIcons.strokeRoundedMoreVertical;
   static const privacy = HugeIcons.strokeRoundedShield01;

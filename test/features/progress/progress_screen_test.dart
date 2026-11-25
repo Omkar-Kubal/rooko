@@ -900,6 +900,9 @@ class FakeProgressPlatform implements TrackingPlatform {
   Future<bool> openInstagramProfile(String handle) async => true;
 
   @override
+  Future<bool> openInstagramHashtag(String tag) async => true;
+
+  @override
   Future<bool> openSupportedAppSettings(String appId) async => true;
 
   @override

@@ -142,6 +142,36 @@ void main() {
     );
   });
 
+  test('opens an Instagram hashtag through the typed native bridge', () async {
+    MethodCall? received;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          received = call;
+          return true;
+        });
+
+    final opened = await platform.openInstagramHashtag('#हिंदी_किताबें');
+
+    expect(opened, isTrue);
+    expect(received?.method, 'openInstagramHashtag');
+    expect(
+      (received?.arguments as Map<Object?, Object?>)['tag'],
+      'हिंदी_किताबें',
+    );
+  });
+
+  test('rejects an invalid hashtag without calling the native bridge', () async {
+    var invoked = false;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          invoked = true;
+          return true;
+        });
+
+    expect(await platform.openInstagramHashtag('two words'), isFalse);
+    expect(invoked, isFalse);
+  });
+
   test(
     'persists affirmative consent before requesting Android access',
     () async {

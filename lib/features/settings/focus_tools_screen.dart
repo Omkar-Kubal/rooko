@@ -4,11 +4,19 @@ import '../../core/design_system/app_colors.dart';
 import '../../core/design_system/app_icons.dart';
 import '../../core/design_system/app_typography.dart';
 import 'creator_shelf_screen.dart';
+import 'hashtag_shelf_screen.dart';
 
 class FocusToolsScreen extends StatelessWidget {
-  const FocusToolsScreen({super.key, required this.openInstagramProfile});
+  const FocusToolsScreen({
+    super.key,
+    required this.openInstagramProfile,
+    required this.openInstagramHashtag,
+    required this.openInstagramApp,
+  });
 
   final InstagramProfileOpener openInstagramProfile;
+  final InstagramHashtagOpener openInstagramHashtag;
+  final InstagramAppOpener openInstagramApp;
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +69,40 @@ class FocusToolsScreen extends StatelessWidget {
                 MaterialPageRoute<void>(
                   builder: (_) => CreatorShelfScreen(
                     openInstagramProfile: openInstagramProfile,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.x3),
+          Card(
+            color: colors.surfaceContainer,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadii.card),
+            ),
+            child: ListTile(
+              key: const ValueKey('focus-tools-hashtag-shelf'),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.x4,
+                vertical: AppSpacing.x1,
+              ),
+              leading: const AppIcon(
+                icon: AppIcons.hashtag,
+                size: AppIconSizes.large,
+              ),
+              title: Text('Hashtag shelf', style: AppTypography.cardTitle),
+              subtitle: Text(
+                'Saved Instagram searches',
+                style: AppTypography.supporting.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+              trailing: const AppIcon(icon: AppIcons.next),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => HashtagShelfScreen(
+                    openInstagramHashtag: openInstagramHashtag,
+                    openInstagramApp: openInstagramApp,
                   ),
                 ),
               ),

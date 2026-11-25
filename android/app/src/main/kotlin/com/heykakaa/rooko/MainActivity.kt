@@ -14,6 +14,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.time.LocalDate
+import java.util.Locale
 import java.util.UUID
 
 class MainActivity : FlutterActivity() {
@@ -151,6 +152,10 @@ class MainActivity : FlutterActivity() {
 
             "openInstagramProfile" -> {
                 result.success(openInstagramProfile(call.argument<String>("handle")))
+            }
+
+            "openInstagramHashtag" -> {
+                result.success(openInstagramHashtag(call.argument<String>("tag")))
             }
 
             "openSupportedAppSettings" -> {
@@ -312,6 +317,45 @@ class MainActivity : FlutterActivity() {
         } catch (_: Exception) {
             false
         }
+    }
+
+    private fun openInstagramHashtag(tag: String?): Boolean {
+        val normalizedTag = tag?.lowercase(Locale.ROOT) ?: return false
+        if (!isValidInstagramHashtag(normalizedTag)) return false
+
+        return try {
+            val encodedTag = Uri.encode(normalizedTag)
+            val searchUri = Uri.parse(
+                "https://www.instagram.com/explore/tags/$encodedTag/",
+            )
+            val intent = Intent(Intent.ACTION_VIEW, searchUri)
+                .setPackage("com.instagram.android")
+            if (intent.resolveActivity(packageManager) == null) return false
+            startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun isValidInstagramHashtag(tag: String): Boolean {
+        if (tag.codePointCount(0, tag.length) !in 1..100) return false
+        var index = 0
+        while (index < tag.length) {
+            val codePoint = tag.codePointAt(index)
+            val type = Character.getType(codePoint)
+            val supported = Character.isLetter(codePoint) ||
+                type == Character.NON_SPACING_MARK.toInt() ||
+                type == Character.COMBINING_SPACING_MARK.toInt() ||
+                type == Character.ENCLOSING_MARK.toInt() ||
+                type == Character.DECIMAL_DIGIT_NUMBER.toInt() ||
+                type == Character.LETTER_NUMBER.toInt() ||
+                type == Character.OTHER_NUMBER.toInt() ||
+                codePoint == '_'.code
+            if (!supported) return false
+            index += Character.charCount(codePoint)
+        }
+        return true
     }
 
     private fun openSupportedAppSettings(appId: String?): Boolean {

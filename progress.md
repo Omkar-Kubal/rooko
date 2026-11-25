@@ -1,5 +1,16 @@
 # Rooko project progress
 
+## Hashtag shelf implementation (2026-11-25)
+
+- The user approved Hashtag shelf as the second active Focus tool. Implementation is complete on branch `codex/hashtag-shelf`, based on `main`; the Creator shelf implementation is preserved.
+- Added Unicode hashtag normalization, separate ordered local preferences, the typed Flutter–Kotlin bridge, Instagram-only URL intent, Settings → Focus tools entry, and the shelf screen with add/edit/remove/copy, manual-search and browser fallback, and explicit unavailable messages. No permissions, Rooko network requests, analytics fields, or tracking records were added.
+- Promoted Hashtag shelf in PRD §4.4, added PR-19 and SRS FR-074, disclosed local hashtag storage in the Google Sites-ready policy source, and updated this project context.
+- Verification: `flutter test --no-pub` — 184 passed. `flutter analyze --no-pub --no-fatal-infos` — exit 0 with three pre-existing Rive deprecation infos. `flutter build apk --debug --no-pub` passed with a temporary explicit Flutter JDK 17 override; the override was cleared and Flutter's original Android Studio JDK 25 default restored. `git diff --check` passed. APK installation on OPPO CPH2565 / Android 15 succeeded with `adb install -r`.
+- Instagram 457.0.0.55.73 opened the tag URL in `ExploreExternalUrlHandlerActivity` with the query prefilled. Instagram initially selected **For you**; manually selecting **Tags** displayed filtered results. The app handoff works, but one-tap landing on the tag-results view remains unverified. At 200% text the shelf/add flow and link launch worked. The shelf also remained usable with Rooko Accessibility off; with it on, Rooko's service remained enabled and bound.
+- Follow-up check with `#fitness` on OPPO CPH2565 (2026-11-25): saved the tag, opened its prefilled Instagram search, confirmed **For you** was initially selected, then selected **Tags** and confirmed that tab became selected. Returned to Rooko with `#fitness` still saved. Accessibility remains on, TalkBack off, and system font scale 0.9.
+- Temporarily enabled TalkBack 17.1.0.1003738110. Android's accessibility tree exposed Back, page title, Add hashtag, explanatory copy, and the empty-state label; spoken output was not independently captured. Restored TalkBack off, Rooko Accessibility on, font scale 0.9, Appearance System, and floating-counter overlay access on. Removed temporary `#rookoqa2026`; Creator Shelf data was not opened or changed.
+- Final read-only review found no critical or important issues. Minor deferred: no direct Kotlin unit test asserts the Instagram intent's URI encoding and package restriction; the device handoff was exercised. Saved order follows insertion order; the approved plan does not require a manual reorder control.
+
 ## Creator shelf implementation (2026-11-25)
 
 - The user approved Creator shelf as the first active focus feature and requested implementation. Work is on branch `codex/creator-shelf`, carrying forward all pre-existing uncommitted changes and untracked assets.

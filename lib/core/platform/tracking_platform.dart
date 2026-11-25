@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 
 import '../models/creator_profile.dart';
+import '../models/instagram_hashtag.dart';
 import '../models/progress.dart';
 import '../models/supported_app.dart';
 
@@ -194,6 +195,8 @@ abstract interface class TrackingPlatform {
 
   Future<bool> openInstagramProfile(String handle);
 
+  Future<bool> openInstagramHashtag(String tag);
+
   Future<bool> openSupportedAppSettings(String appId);
 
   Future<bool> openSupportEmail(SupportEmailKind kind);
@@ -281,6 +284,17 @@ class MethodChannelTrackingPlatform implements TrackingPlatform {
     return await channel.invokeMethod<bool>(
           'openInstagramProfile',
           <String, Object?>{'handle': normalizedHandle},
+        ) ??
+        false;
+  }
+
+  @override
+  Future<bool> openInstagramHashtag(String tag) async {
+    final normalizedTag = InstagramHashtag.normalize(tag);
+    if (normalizedTag == null) return false;
+    return await channel.invokeMethod<bool>(
+          'openInstagramHashtag',
+          <String, Object?>{'tag': normalizedTag},
         ) ??
         false;
   }

@@ -27,6 +27,23 @@ void main() {
     expect(find.text('No creators saved yet.'), findsOneWidget);
   });
 
+  testWidgets('opens the Hashtag shelf from Focus tools', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await _pumpSettings(tester, FakeSettingsPlatform());
+
+    await tester.tap(find.byKey(const ValueKey('settings-focus-tools')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('focus-tools-hashtag-shelf')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hashtag shelf'), findsOneWidget);
+    expect(find.text('No hashtags saved yet.'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Focus tools'), findsOneWidget);
+  });
+
   testWidgets(
     'shows settings groups and marks unfinished actions unavailable',
     (tester) async {
@@ -485,6 +502,9 @@ class FakeSettingsPlatform implements TrackingPlatform {
 
   @override
   Future<bool> openInstagramProfile(String handle) async => true;
+
+  @override
+  Future<bool> openInstagramHashtag(String tag) async => true;
 
   @override
   Future<bool> openSupportedAppSettings(String appId) async => true;

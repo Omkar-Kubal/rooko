@@ -353,6 +353,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       MaterialPageRoute<void>(
         builder: (_) => FocusToolsScreen(
           openInstagramProfile: widget.trackingPlatform.openInstagramProfile,
+          openInstagramHashtag: widget.trackingPlatform.openInstagramHashtag,
+          openInstagramApp: () =>
+              widget.trackingPlatform.openSupportedApp('instagram'),
         ),
       ),
     );
@@ -514,7 +517,7 @@ class _SettingsScreenState extends State<SettingsScreen>
               leading: const _SettingsGlyph(icon: AppIcons.creatorGroup),
               title: Text('Focus tools', style: AppTypography.cardTitle),
               subtitle: Text(
-                'Creator shelf',
+                'Creator and Hashtag shelves',
                 style: AppTypography.supporting.copyWith(
                   color: colors.onSurfaceVariant,
                 ),
